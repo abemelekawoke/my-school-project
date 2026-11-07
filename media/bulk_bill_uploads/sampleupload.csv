@@ -1,0 +1,3 @@
+index,bill_id,bill_description,bill_reason,amount_due,customer_id,name,due_date,mobile,email,Prev_Read,Curr_Read,Consumtion
+108628,AK-00111757,YHidar  2017YA/K Telecom Office100001Cr184Pr184C03681.0            2016           20171127.001-04-2017,YHidar  2017YA/K Telecom Office100001Cr184Pr184C03681.0            2016           20171127.001-04-2017,3681,drb100001,A/K Telecom Office,1/8/2025,918510295,tomafik@gmail.com,184,184,0
+108629,AK-00111758,YYekatit  2017YA/K Hospital Office100001Cr184Pr184C03681.0            2016           20171127.001-04-2017,YHidar  2017YA/K Hospital Office100001Cr184Pr184C03681.0            2016           20171127.001-04-2017,4000,drb100002,A/K Hospital Office,1/8/2025,918510295,tomafik@gmail.com,184,185,0

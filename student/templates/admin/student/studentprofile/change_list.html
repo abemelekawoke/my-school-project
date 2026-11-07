@@ -1,0 +1,68 @@
+{% extends "admin/change_list.html" %}
+
+{% block footer %}
+    {{ block.super }}
+    <script>
+        (function () {
+            "use strict";
+
+            function closeModal() {
+                const overlay = document.getElementById("clearanceModalOverlay");
+                if (overlay) overlay.remove();
+                document.body.style.overflow = "";
+            }
+
+            function openModal(studentId) {
+                closeModal();
+                const overlay = document.createElement("div");
+                overlay.id = "clearanceModalOverlay";
+                overlay.innerHTML = '<div style="color:#fff;font-family:sans-serif;padding:20px;">Loading…</div>';
+                document.body.appendChild(overlay);
+                document.body.style.overflow = "hidden";
+
+                fetch("/admin/student/studentprofile/clearance-form/" + studentId + "/", {
+                    headers: { "X-Requested-With": "XMLHttpRequest" },
+                    credentials: "same-origin",
+                })
+                .then(function (r) {
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    return r.text();
+                })
+                .then(function (html) {
+                    overlay.innerHTML = html;
+                    overlay.addEventListener("click", function (e) {
+                        if (e.target === overlay) closeModal();
+                    });
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    overlay.innerHTML = '<div style="background:#fff;padding:20px;color:#b00020;">Failed to load.</div>';
+                });
+            }
+
+            // Listen for close clicks
+            document.addEventListener("click", function (e) {
+                if (e.target.closest("[data-modal-close]")) {
+                    e.preventDefault();
+                    closeModal();
+                }
+            });
+
+            // ESC to close
+            document.addEventListener("keydown", function (e) {
+                if (e.key === "Escape") closeModal();
+            });
+
+            // Auto-open when the page loads with the query param
+            window.addEventListener("load", function () {
+                const params = new URLSearchParams(window.location.search);
+                const id = params.get("clearance_student");
+                if (id) {
+                    // Remove the query param from the URL bar so it doesn't reopen on refresh
+                    window.history.replaceState({}, "", window.location.pathname);
+                    openModal(id);
+                }
+            });
+        })();
+    </script>
+{% endblock %}

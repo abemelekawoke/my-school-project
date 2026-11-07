@@ -1,0 +1,11 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block sidebar %}
+    {{ block.super }}
+    <div>
+        <label for="id_consumption">Value:</label>
+        <input type="number" id="id_consumption" name="consumption" />
+        <button type="submit">Filter</button>
+    </div>
+{% endblock %}

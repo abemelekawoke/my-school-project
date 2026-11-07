@@ -1,0 +1,7 @@
+/* Move import/export buttons to the top-right */
+.object-tools {
+    display: flex;           /* keep buttons in a row */
+    justify-content: flex-end; /* push to the right */
+    gap: 10px;               /* space between buttons */
+    margin-bottom: 10px;     /* space from the table */
+}

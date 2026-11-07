@@ -1,0 +1,237 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="#" id="generate-assessments-btn" class="addlink">📊 Generate Student Assessments</a>
+    </li>
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+
+    <!-- Modal -->
+    <div id="generate-assessment-modal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded shadow-lg w-96">
+            <h2 class="text-lg font-bold mb-4">Generate Student Assessments</h2>
+            <form id="generate-assessment-form" method="post" action="generate-assessments/">
+                {% csrf_token %}
+
+                <!-- Render all fields automatically - SIMPLEST SOLUTION -->
+                {% for field in form %}
+                <div class="mb-3">
+                    <label for="{{ field.id_for_label }}" class="block mb-1 font-medium">
+                        {{ field.label }} <span class="text-red-500">*</span>
+                    </label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ field.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                <div class="flex justify-between mt-4">
+                    <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Generate</button>
+                    <button type="button" id="close-modal" class="btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('generate-assessment-modal');
+            const btn = document.getElementById('generate-assessments-btn');
+            const closeBtn = document.getElementById('close-modal');
+            const form = document.getElementById('generate-assessment-form');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            // Function to get all select fields
+            function getSelectFields() {
+                return form ? form.querySelectorAll('select') : [];
+            }
+            
+            // Function to check if all fields are filled
+            function checkFormValidity() {
+                const selectFields = getSelectFields();
+                let allFilled = true;
+                selectFields.forEach(field => {
+                    if (!field.value) {
+                        allFilled = false;
+                    }
+                });
+                return allFilled;
+            }
+            
+            // Function to update submit button state
+            function updateSubmitButton() {
+                if (checkFormValidity()) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('btn-disabled');
+                } else {
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('btn-disabled');
+                }
+            }
+            
+            // Function to show field error
+            function showFieldError(field) {
+                field.classList.add('border-red-500', 'border-2');
+            }
+            
+            // Function to clear field error
+            function clearFieldError(field) {
+                field.classList.remove('border-red-500', 'border-2');
+            }
+            
+            // Function to initialize form fields
+            function initializeFormFields() {
+                const selectFields = getSelectFields();
+                selectFields.forEach(field => {
+                    // Add required attribute
+                    field.required = true;
+                    
+                    // Add placeholder option if it doesn't exist
+                    if (!field.querySelector('option[value=""]')) {
+                        const placeholder = document.createElement('option');
+                        placeholder.value = "";
+                        placeholder.textContent = "Select " + field.name.replace(/_/g, ' ');
+                        placeholder.selected = true;
+                        placeholder.disabled = true;
+                        field.insertBefore(placeholder, field.firstChild);
+                    }
+                    
+                    // Add change event listener
+                    field.addEventListener('change', function() {
+                        // Clear error styling
+                        clearFieldError(this);
+                        
+                        // Update button state
+                        updateSubmitButton();
+                        
+                        // If field is still empty, add error styling
+                        if (!this.value) {
+                            showFieldError(this);
+                        }
+                    });
+                });
+                
+                // Initial button state
+                updateSubmitButton();
+            }
+            
+            // Open modal
+            btn.onclick = function(e) {
+                e.preventDefault();
+                modal.classList.remove('hidden');
+                
+                // Initialize form fields
+                initializeFormFields();
+                
+                // Reset form and disable button
+                if (form) {
+                    form.reset();
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('btn-disabled');
+                    
+                    // Clear any errors
+                    const selectFields = getSelectFields();
+                    selectFields.forEach(field => clearFieldError(field));
+                }
+            }
+            
+            // Close modal
+            closeBtn.onclick = function() {
+                modal.classList.add('hidden');
+                if (form) form.reset();
+                submitBtn.disabled = true;
+                submitBtn.classList.add('btn-disabled');
+            }
+            
+            // Close modal when clicking outside
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.classList.add('hidden');
+                    if (form) form.reset();
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('btn-disabled');
+                }
+            }
+            
+            // Form submission handler
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    // Check if all fields are filled
+                    if (!checkFormValidity()) {
+                        e.preventDefault();
+                        
+                        // Highlight empty fields
+                        const selectFields = getSelectFields();
+                        selectFields.forEach(field => {
+                            if (!field.value) {
+                                showFieldError(field);
+                            }
+                        });
+                        
+                        // Show alert
+                        alert('Please fill in all required fields before generating assessments.');
+                        return false;
+                    }
+                    
+                    // If valid, show processing state
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Generating...';
+                    submitBtn.classList.add('btn-disabled');
+                    
+                    // Allow form to submit
+                    return true;
+                });
+            }
+            
+            // Add Escape key to close modal
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    modal.classList.add('hidden');
+                    if (form) form.reset();
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('btn-disabled');
+                }
+            });
+        });
+    </script>
+    
+    <style>
+        .btn-disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .border-red-500 {
+            border-color: #ef4444 !important;
+        }
+        
+        /* Style the select dropdowns properly */
+        .select-bordered {
+            border-width: 1px;
+            border-color: #d1d5db;
+        }
+        
+        .select-bordered:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        /* Make sure selects have proper styling */
+        select.select {
+            display: block;
+            width: 100%;
+            /*padding: 0.5rem 2.5rem 0.5rem 1rem;*/
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+        }
+    </style>
+{% endblock %}

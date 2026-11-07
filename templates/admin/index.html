@@ -1,0 +1,613 @@
+{% extends "admin/index.html" %}
+{% load i18n static custom_tags %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link href="{% static 'css/output.css' %}" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<style>
+  /* Scoped variables to prevent affecting admin menus */
+  .uog-dashboard {
+    --uog-blue: #0056b3;
+    --uog-gold: #FFD700;
+    --uog-light-blue: #e6f0fa;
+    --uog-dark-blue: #003366;
+    --uog-success: #27ae60;
+    --uog-warning: #e67e22;
+    --uog-danger: #e74c3c;
+    --uog-purple: #8e44ad;
+    --education-color: #3498db;
+    --academic-color: #9b59b6;
+    --promotion-color: #2ecc71;
+    --training-color: #f39c12;
+    --returned-color: #1abc9c;
+    --opportunity-color: #d35400;
+    --separated-color: #e74c3c;
+  }
+
+  /* Dashboard header */
+  .uog-dashboard #content {
+    padding: 15px 20px;
+    background-color: #f8f9fa;
+  }
+
+  .uog-dashboard .dashboard {
+    margin-bottom: 20px;
+  }
+
+  .uog-dashboard .dashboard-title {
+    font-size: 22px;
+    color: var(--uog-dark-blue);
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--uog-blue);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+  }
+
+  .uog-dashboard .dashboard-title:before {
+    content: "\f201";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    margin-right: 12px;
+    color: var(--uog-blue);
+    font-size: 20px;
+  }
+
+  .uog-dashboard .dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .uog-dashboard .dashboard-card {
+    background: white;
+    padding: 1.2rem;
+    border-left: 3px solid var(--uog-blue);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .uog-dashboard .dashboard-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.12);
+  }
+
+  .uog-dashboard .dashboard-card h3 {
+    margin: 0 0 0.9rem 0;
+    font-size: 0.95rem;
+    color: var(--uog-dark-blue);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .uog-dashboard .dashboard-card h3 i {
+    margin-right: 10px;
+    font-size: 1.1rem;
+    width: 24px;
+    text-align: center;
+  }
+
+  .uog-dashboard .card-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+  }
+
+  .uog-dashboard .card-value:before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    background: var(--uog-blue);
+  }
+
+  .uog-dashboard .card-employees {
+    border-left-color: var(--uog-blue);
+    background: linear-gradient(to right, rgba(0, 86, 179, 0.07), white);
+  }
+  .uog-dashboard .card-employees .card-value { color: var(--uog-blue); }
+  .uog-dashboard .card-employees h3 i    { color: var(--uog-blue); }
+
+  .uog-dashboard .card-separated {
+    border-left-color: var(--separated-color);
+    background: linear-gradient(to right, rgba(231, 76, 60, 0.07), white);
+  }
+  .uog-dashboard .card-separated .card-value { color: var(--separated-color); }
+  .uog-dashboard .card-separated h3 i    { color: var(--separated-color); }
+  .uog-dashboard .card-separated .card-value:before { background: var(--separated-color); }
+
+  .uog-dashboard .card-education {
+    border-left-color: var(--education-color);
+    background: linear-gradient(to right, rgba(52, 152, 219, 0.07), white);
+  }
+  .uog-dashboard .card-education .card-value { color: var(--education-color); }
+  .uog-dashboard .card-education h3 i    { color: var(--education-color); }
+  .uog-dashboard .card-education .card-value:before { background: var(--education-color); }
+
+  .uog-dashboard .card-academic {
+    border-left-color: var(--academic-color);
+    background: linear-gradient(to right, rgba(155, 89, 182, 0.07), white);
+  }
+  .uog-dashboard .card-academic .card-value { color: var(--academic-color); }
+  .uog-dashboard .card-academic h3 i    { color: var(--academic-color); }
+  .uog-dashboard .card-academic .card-value:before { background: var(--academic-color); }
+
+  .uog-dashboard .card-promotion {
+    border-left-color: var(--promotion-color);
+    background: linear-gradient(to right, rgba(46, 204, 113, 0.07), white);
+  }
+  .uog-dashboard .card-promotion .card-value { color: var(--promotion-color); }
+  .uog-dashboard .card-promotion h3 i    { color: var(--promotion-color); }
+  .uog-dashboard .card-promotion .card-value:before { background: var(--promotion-color); }
+
+  .uog-dashboard .card-training {
+    border-left-color: var(--training-color);
+    background: linear-gradient(to right, rgba(243, 156, 18, 0.07), white);
+  }
+  .uog-dashboard .card-training .card-value { color: var(--training-color); }
+  .uog-dashboard .card-training h3 i    { color: var(--training-color); }
+  .uog-dashboard .card-training .card-value:before { background: var(--training-color); }
+
+  .uog-dashboard .card-returned {
+    border-left-color: var(--returned-color);
+    background: linear-gradient(to right, rgba(26, 188, 156, 0.07), white);
+  }
+  .uog-dashboard .card-returned .card-value { color: var(--returned-color); }
+  .uog-dashboard .card-returned h3 i    { color: var(--returned-color); }
+  .uog-dashboard .card-returned .card-value:before { background: var(--returned-color); }
+
+  .uog-dashboard .card-opportunity {
+    border-left-color: var(--opportunity-color);
+    background: linear-gradient(to right, rgba(211, 84, 0, 0.07), white);
+  }
+  .uog-dashboard .card-opportunity .card-value { color: var(--opportunity-color); }
+  .uog-dashboard .card-opportunity h3 i    { color: var(--opportunity-color); }
+  .uog-dashboard .card-opportunity .card-value:before { background: var(--opportunity-color); }
+
+  .uog-dashboard .progress-container {
+    margin-top: 0.9rem;
+    background: #f0f0f0;
+    border-radius: 8px;
+    height: 18px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .uog-dashboard .progress-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    height: 100%;
+    width: 100%;
+  }
+
+  .uog-dashboard .progress-bar {
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.6s ease-in-out;
+    position: relative;
+  }
+
+  .uog-dashboard .progress-bar.male {
+    background: linear-gradient(90deg, var(--uog-blue), #2980b9);
+  }
+
+  .uog-dashboard .progress-bar.female {
+    background: linear-gradient(90deg, var(--uog-gold), #f1c40f);
+  }
+
+  .uog-dashboard .progress-text {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: bold;
+    text-shadow: 0 0 2px rgba(0,0,0,0.4);
+    z-index: 2;
+  }
+
+  .uog-dashboard .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .uog-dashboard .progress-label {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+  }
+
+  .uog-dashboard .progress-label.male   { color: var(--uog-blue); }
+  .uog-dashboard .progress-label.female { color: var(--uog-gold); }
+  .uog-dashboard .progress-label i      { margin-right: 5px; font-size: 0.9rem; }
+
+  .uog-dashboard .icon-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-size: 1.8rem;
+    opacity: 0.08;
+    z-index: 0;
+  }
+
+  @media (max-width: 1200px) {
+    .uog-dashboard .dashboard-cards {
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+  }
+
+  @media (max-width: 768px) {
+    .uog-dashboard .dashboard-cards {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    .uog-dashboard #content { padding: 12px; }
+    .uog-dashboard .dashboard-title { font-size: 19px; margin-bottom: 15px; }
+    .uog-dashboard .dashboard-card  { padding: 1rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="uog-dashboard">
+  <div class="dashboard">
+    <h1 class="dashboard-title">የአስተዳዳሪ ማዕከላዊ ዳሽቦርድ</h1>
+
+    <!-- 🎯 Summary Cards -->
+    <div class="grid grid-cols-3 gap-4 mb-8">
+      <div class="card bg-base-100 shadow-md p-4">
+        <h2 class="text-lg font-semibold">Total Students</h2>
+        <p class="text-3xl font-bold text-primary">{{ student_count|default:"0" }}</p>
+      </div>
+      <div class="card bg-base-100 shadow-md p-4">
+        <h2 class="text-lg font-semibold">Male</h2>
+        <p class="text-3xl font-bold text-blue-600">{{ male_count|default:"0" }}</p>
+        <p class="text-sm text-gray-500">{{ male_percent|default:"0" }}%</p>
+      </div>
+      <div class="card bg-base-100 shadow-md p-4">
+        <h2 class="text-lg font-semibold">Female</h2>
+        <p class="text-3xl font-bold text-pink-600">{{ female_count|default:"0" }}</p>
+        <p class="text-sm text-gray-500">{{ female_percent|default:"0" }}%</p>
+      </div>
+    </div>
+
+    <!-- 📊 Pivot Grid -->
+    <div class="overflow-x-auto mb-10">
+      <table class="table w-full">
+        <thead>
+          <tr>
+            <th>School</th>
+            {% for gender_code, gender_label in genders.items %}
+              <th>{{ gender_label }}</th>
+            {% endfor %}
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in pivot_display %}
+          <tr>
+            <td>{{ row.school_label }}</td>
+            {% for gender_code, gender_label in genders.items %}
+              <td>{{ row.gender_counts|get_item:gender_code }}</td>
+            {% endfor %}
+            <td class="font-bold">{{ row.total }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-gray-500">No data available</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 📊 Dynamic Bar Chart: Gender Distribution by Grade -->
+    <div class="card bg-base-100 shadow-md p-6 mb-10" style="height: 300px; width: 100%;">
+      <canvas id="gradeGenderChart"></canvas>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const gradeCtx = document.getElementById('gradeGenderChart').getContext('2d');
+
+      // 💙 Male Gradient: Deep Blue to Sky Blue
+      const maleGradient = gradeCtx.createLinearGradient(0, 0, 0, 300);
+      maleGradient.addColorStop(0,   '#1e3a8a');
+      maleGradient.addColorStop(0.5, '#3b82f6');
+      maleGradient.addColorStop(1,   '#60a5fa');
+
+      // 💛 Female Gradient: Golden to Soft Yellow
+      const femaleGradient = gradeCtx.createLinearGradient(0, 0, 0, 300);
+      femaleGradient.addColorStop(0,   '#f59e0b');
+      femaleGradient.addColorStop(0.5, '#fbbf24');
+      femaleGradient.addColorStop(1,   '#fde68a');
+
+      new Chart(gradeCtx, {
+        type: 'bar',
+        data: {
+          labels: {{ grade_chart_labels|default:"[]"|safe }},
+          datasets: [
+            {
+              label: 'Male',
+              data: {{ grade_male_data|default:"[]"|safe }},
+              backgroundColor: maleGradient,
+              borderRadius: 6,
+              borderSkipped: false
+            },
+            {
+              label: 'Female',
+              data: {{ grade_female_data|default:"[]"|safe }},
+              backgroundColor: femaleGradient,
+              borderRadius: 6,
+              borderSkipped: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 1200, easing: 'easeOutQuart' },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { font: { family: 'Inter, sans-serif', size: 14, weight: '600' } }
+            },
+            title: {
+              display: true,
+              text: 'Gender Distribution by Grade Levels',
+              font: { family: 'Inter, sans-serif', size: 18, weight: '700' }
+            },
+            tooltip: {
+              backgroundColor: '#1f2937',
+              titleColor: '#f9fafb',
+              bodyColor: '#d1d5db',
+              borderColor: '#9ca3af',
+              borderWidth: 1,
+              cornerRadius: 6,
+              padding: 10,
+              titleFont: { family: 'Inter, sans-serif', weight: '700' },
+              bodyFont:  { family: 'Inter, sans-serif', weight: '500' }
+            },
+            datalabels: {
+              anchor: 'end',
+              align: 'start',
+              offset: -19,
+              font: { family: 'Inter, sans-serif', weight: 'bold', size: 12 },
+              formatter: Math.round,
+              color: '#374151'
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Grade Level',
+                font: { family: 'Inter, sans-serif', size: 14, weight: 'bold', color: '#040405' },
+                padding: { top: 0, bottom: 26 }
+              },
+              ticks: {
+                autoSkip: false,
+                maxRotation: 45,
+                minRotation: 45,
+                font: { family: 'Inter, sans-serif', size: 12 }
+              },
+              grid: { display: false }
+            },
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Number of Students',
+                font: { family: 'Inter, sans-serif', size: 14, weight: 'bold' }
+              },
+              ticks: { font: { family: 'Inter, sans-serif', size: 12 } },
+              grid:  { color: 'rgba(0,0,0,0.05)' }
+            }
+          },
+          elements: { bar: { borderRadius: 6, borderSkipped: false } }
+        },
+        plugins: [ChartDataLabels]
+      });
+    });
+    </script>
+
+    <!-- 🧑‍💼 Employee Cards -->
+    <div class="dashboard-cards">
+
+      <!-- Total Employees Card -->
+      <div class="dashboard-card card-employees">
+        <i class="fas fa-users icon-badge"></i>
+        <h3><i class="fas fa-users"></i> በስራ ላይ ያሉ አጠቃላይ ሠራተኞች</h3>
+        <div class="card-value">ድምር፡ {{ employee_count|default:"0" }}</div>
+        <div class="progress-container">
+          <div class="progress-bars">
+            <div class="progress-bar male"   style="width: {{ male_percent|default:'0' }}%">
+              <span class="progress-text">{{ male_percent|default:"0" }}%</span>
+            </div>
+            <div class="progress-bar female" style="width: {{ female_percent|default:'0' }}%">
+              <span class="progress-text">{{ female_percent|default:"0" }}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="progress-labels">
+          <span class="progress-label male">
+            <i class="fas fa-male"></i> ወንድ: {{ male_count|default:"0" }} ({{ male_percent|default:"0" }}%)
+          </span>
+          <span class="progress-label female">
+            <i class="fas fa-female"></i> ሴት: {{ female_count|default:"0" }} ({{ female_percent|default:"0" }}%)
+          </span>
+        </div>
+      </div>
+
+      <!-- Separated Employees Card -->
+      <div class="dashboard-card card-separated">
+        <i class="fas fa-user-times icon-badge"></i>
+        <h3><i class="fas fa-user-times"></i> በተለያዩ ምክንያቶች ስራ የለቀቁ ሠራተኞች</h3>
+        <div class="card-value">ድምር፡ {{ separated_count|default:"0" }}</div>
+        <div class="progress-container">
+          <div class="progress-bars">
+            <div class="progress-bar male"   style="width: {{ separated_male_percent|default:'0' }}%">
+              <span class="progress-text">{{ separated_male_percent|default:"0" }}%</span>
+            </div>
+            <div class="progress-bar female" style="width: {{ separated_female_percent|default:'0' }}%">
+              <span class="progress-text">{{ separated_female_percent|default:"0" }}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="progress-labels">
+          <span class="progress-label male">
+            <i class="fas fa-male"></i> ወንድ: {{ separated_male_count|default:"0" }} ({{ separated_male_percent|default:"0" }}%)
+          </span>
+          <span class="progress-label female">
+            <i class="fas fa-female"></i> ሴት: {{ separated_female_count|default:"0" }} ({{ separated_female_percent|default:"0" }}%)
+          </span>
+        </div>
+      </div>
+
+      <!-- Education Level Card -->
+      <div class="dashboard-card card-education">
+        <i class="fas fa-graduation-cap icon-badge"></i>
+        <h3><i class="fas fa-graduation-cap"></i> የደረጃ እድገት ያገኙ መምህራን</h3>
+        <div class="card-value">ድምር፡ {{ official_count|default:"0" }}</div>
+        <div class="progress-container">
+          <div class="progress-bars">
+            <div class="progress-bar male"   style="width: {{ maleo_percent|default:'0' }}%">
+              <span class="progress-text">{{ maleo_percent|default:"0" }}%</span>
+            </div>
+            <div class="progress-bar female" style="width: {{ femaleo_percent|default:'0' }}%">
+              <span class="progress-text">{{ femaleo_percent|default:"0" }}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="progress-labels">
+          <span class="progress-label male">
+            <i class="fas fa-male"></i> ወንድ: {{ maleo_count|default:"0" }} ({{ maleo_percent|default:"0" }}%)
+          </span>
+          <span class="progress-label female">
+            <i class="fas fa-female"></i> ሴት: {{ femaleo_count|default:"0" }} ({{ femaleo_percent|default:"0" }}%)
+          </span>
+        </div>
+      </div>
+
+      <!-- Academic Rank Card -->
+      <div class="dashboard-card card-academic">
+        <i class="fas fa-award icon-badge"></i>
+        <h3><i class="fas fa-award"></i> የረዥም ጊዜ ስልጠና ላይ ያሉ መምህራን</h3>
+        <div class="card-value">ድምር፡ {{ training_count|default:"0" }}</div>
+        <div class="progress-container">
+          <div class="progress-bars">
+            <div class="progress-bar male"   style="width: {{ training_male_percent|default:'0' }}%">
+              <span class="progress-text">{{ training_male_percent|default:"0" }}%</span>
+            </div>
+            <div class="progress-bar female" style="width: {{ training_female_percent|default:'0' }}%">
+              <span class="progress-text">{{ training_female_percent|default:"0" }}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="progress-labels">
+          <span class="progress-label male">
+            <i class="fas fa-male"></i> ወንድ: {{ training_male_count|default:"0" }} ({{ training_male_percent|default:"0" }}%)
+          </span>
+          <span class="progress-label female">
+            <i class="fas fa-female"></i> ሴት: {{ training_female_count|default:"0" }} ({{ training_female_percent|default:"0" }}%)
+          </span>
+        </div>
+      </div>
+
+      <!-- Returned from Training Card -->
+      <div class="dashboard-card card-returned">
+        <i class="fas fa-user-graduate icon-badge"></i>
+        <h3><i class="fas fa-user-graduate"></i> ከስልጠና ተመልሰው ስራ የጀመሩ መምህራን</h3>
+        <div class="card-value">ድምር፡ {{ returned_count|default:"0" }}</div>
+        <div class="progress-container">
+          <div class="progress-bars">
+            <div class="progress-bar male"   style="width: {{ returned_male_percent|default:'0' }}%">
+              <span class="progress-text">{{ returned_male_percent|default:"0" }}%</span>
+            </div>
+            <div class="progress-bar female" style="width: {{ returned_female_percent|default:'0' }}%">
+              <span class="progress-text">{{ returned_female_percent|default:"0" }}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="progress-labels">
+          <span class="progress-label male">
+            <i class="fas fa-male"></i> ወንድ: {{ returned_male_count|default:"0" }} ({{ returned_male_percent|default:"0" }}%)
+          </span>
+          <span class="progress-label female">
+            <i class="fas fa-female"></i> ሴት: {{ returned_female_count|default:"0" }} ({{ returned_female_percent|default:"0" }}%)
+          </span>
+        </div>
+      </div>
+
+      <!-- Not Returned from Training Card -->
+      <div class="dashboard-card card-training">
+        <i class="fas fa-clock icon-badge"></i>
+        <h3><i class="fas fa-clock"></i> ከስልጠና ተመልሰው ስራ ያልጀመሩ መምህራን</h3>
+        <div class="card-value">ድምር፡ {{ not_returned_count|default:"0" }}</div>
+        <div class="progress-container">
+          <div class="progress-bars">
+            <div class="progress-bar male"   style="width: {{ not_returned_male_percent|default:'0' }}%">
+              <span class="progress-text">{{ not_returned_male_percent|default:"0" }}%</span>
+            </div>
+            <div class="progress-bar female" style="width: {{ not_returned_female_percent|default:'0' }}%">
+              <span class="progress-text">{{ not_returned_female_percent|default:"0" }}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="progress-labels">
+          <span class="progress-label male">
+            <i class="fas fa-male"></i> ወንድ: {{ not_returned_male_count|default:"0" }} ({{ not_returned_male_percent|default:"0" }}%)
+          </span>
+          <span class="progress-label female">
+            <i class="fas fa-female"></i> ሴት: {{ not_returned_female_count|default:"0" }} ({{ not_returned_female_percent|default:"0" }}%)
+          </span>
+        </div>
+      </div>
+
+      <!-- Opportunity Card -->
+      <div class="dashboard-card card-opportunity">
+        <i class="fas fa-briefcase icon-badge"></i>
+        <h3><i class="fas fa-briefcase"></i> የት/ት እድል ያገኙ ሰራተኞች</h3>
+        <div class="card-value">ድምር፡ {{ opportunity_count|default:"0" }}</div>
+        <div class="progress-container">
+          <div class="progress-bars">
+            <div class="progress-bar male"   style="width: {{ opportunity_male_percent|default:'0' }}%">
+              <span class="progress-text">{{ opportunity_male_percent|default:"0" }}%</span>
+            </div>
+            <div class="progress-bar female" style="width: {{ opportunity_female_percent|default:'0' }}%">
+              <span class="progress-text">{{ opportunity_female_percent|default:"0" }}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="progress-labels">
+          <span class="progress-label male">
+            <i class="fas fa-male"></i> ወንድ: {{ opportunity_male_count|default:"0" }} ({{ opportunity_male_percent|default:"0" }}%)
+          </span>
+          <span class="progress-label female">
+            <i class="fas fa-female"></i> ሴት: {{ opportunity_female_count|default:"0" }} ({{ opportunity_female_percent|default:"0" }}%)
+          </span>
+        </div>
+      </div>
+
+    </div><!-- /.dashboard-cards -->
+  </div><!-- /.dashboard -->
+</div><!-- /.uog-dashboard -->
+{% endblock %}

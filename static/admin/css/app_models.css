@@ -1,0 +1,36 @@
+/* .center-panel {
+  margin-left: 280px;  
+  padding: 20px;
+}
+
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.model-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  text-decoration: none;
+  color: #333;
+  box-shadow: 0 4px 8px rgba(0,0,0,.08);
+  transition: 0.2s;
+}
+
+.model-card:hover {
+  transform: translateY(-3px);
+}
+
+.model-card i {
+  font-size: 32px;
+  margin-bottom: 10px;
+  color: #0d6efd;
+}
+
+.hint {
+  color: #777;
+}
+ */

@@ -1,0 +1,5 @@
+index,bill_id,bill_description,bill_reason,amount_due,customer_id,name,due_date,mobile,email,Prev_Read,Curr_Read,Consumtion
+988469456,DRB-00199,YHidar  2017YA/K Telecom Office,YHidar  2017YA/K Telecom Office,3681,DRB-1001113,A/K Telecom Office,4/8/2025,918510295,tomafik@gmail.com,184,184,0
+988469456,DRB-01369,YYekatit  2017YA/K Hospital Office,YYekatit  2017YA/K Hospital Office,4000,DRB-1002226,A/K Hospital Office,4/8/2025,918510295,tomafik@gmail.com,184,185,1
+988469456,DRB-00739,YHidar  2017YA/K Telecom Office,YHidar  2017YA/K Telecom Office,4319,DRB-1003339,A/K Telecom Office,4/8/2025,918510295,tomafik@gmail.com,184,186,2
+988469456,DRB-00179,YYekatit  2017YA/K Hospital Office,YYekatit  2017YA/K Hospital Office,4638,DRB-1004452,A/K Hospital Office,4/8/2025,918510295,tomafik@gmail.com,184,187,3

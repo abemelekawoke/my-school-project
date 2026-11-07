@@ -1,0 +1,157 @@
+{% load static %}
+<form method="post"
+      action="{% url 'admin:student_studentassessment_generate' %}"
+      id="generate-form"
+      novalidate>
+    {% csrf_token %}
+
+    <div class="space-y-4">
+
+        {# Subject #}
+        <div>
+            <label class="block mb-1 font-medium">Subject <span class="text-red-500">*</span></label>
+            <select name="subject" id="id_subject" class="select select-bordered w-full" required>
+                <option value="" disabled {% if not form.subject.value %}selected{% endif %}>Select Subject</option>
+                {% for value, label in form.subject.field.choices %}
+                    <option value="{{ value }}"
+                        {% if form.subject.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% if form.subject.errors %}
+                <p class="text-red-500 text-sm mt-1">{{ form.subject.errors.0 }}</p>
+            {% endif %}
+            <p class="text-red-500 text-sm mt-1 hidden" id="subject-error">Please select a subject</p>
+        </div>
+
+        {# Academic Year #}
+        <div>
+            <label class="block mb-1 font-medium">Academic Year <span class="text-red-500">*</span></label>
+            <select name="academic_year" id="id_academic_year" class="select select-bordered w-full" required>
+                <option value="" disabled {% if not form.academic_year.value %}selected{% endif %}>Select Academic Year</option>
+                {% for value, label in form.academic_year.field.choices %}
+                    <option value="{{ value }}"
+                        {% if form.academic_year.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% if form.academic_year.errors %}
+                <p class="text-red-500 text-sm mt-1">{{ form.academic_year.errors.0 }}</p>
+            {% endif %}
+            <p class="text-red-500 text-sm mt-1 hidden" id="academic-year-error">Please select an academic year</p>
+        </div>
+
+        {# Term #}
+        <div>
+            <label class="block mb-1 font-medium">Term <span class="text-red-500">*</span></label>
+            <select name="term" id="id_term" class="select select-bordered w-full" required>
+                <option value="" disabled {% if not form.term.value %}selected{% endif %}>Select Term</option>
+                {% for value, label in form.term.field.choices %}
+                    <option value="{{ value }}"
+                        {% if form.term.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% if form.term.errors %}
+                <p class="text-red-500 text-sm mt-1">{{ form.term.errors.0 }}</p>
+            {% endif %}
+            <p class="text-red-500 text-sm mt-1 hidden" id="term-error">Please select a term</p>
+        </div>
+
+        <div id="form-status" class="hidden p-3 rounded text-sm"></div>
+
+        <div class="flex justify-between mt-6 pt-4 border-t">
+            <button type="submit" id="submit-btn" class="btn btn-primary px-6" disabled>
+                <span id="btn-text">Generate</span>
+                <span id="btn-spinner" class="hidden ml-2">
+                    <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" class="btn btn-outline px-6"
+                    onclick="document.getElementById('modal-generate').close()">Cancel</button>
+        </div>
+    </div>
+</form>
+
+<script>
+(function () {
+    const form         = document.getElementById('generate-form');
+    const submitBtn    = document.getElementById('submit-btn');
+    const btnText      = document.getElementById('btn-text');
+    const btnSpinner   = document.getElementById('btn-spinner');
+    const formStatus   = document.getElementById('form-status');
+
+    function checkValidity() {
+        const ids = ['id_subject', 'id_academic_year', 'id_term'];
+        const ok  = ids.every(id => {
+            const el = document.getElementById(id);
+            return el && el.value;
+        });
+        submitBtn.disabled = !ok;
+        submitBtn.classList.toggle('opacity-50', !ok);
+        return ok;
+    }
+
+    function showStatus(msg, type) {
+        formStatus.textContent = msg;
+        formStatus.className = 'p-3 rounded text-sm ' +
+            (type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700');
+        formStatus.classList.remove('hidden');
+        if (type === 'success') setTimeout(() => formStatus.classList.add('hidden'), 5000);
+    }
+
+    ['id_subject', 'id_academic_year', 'id_term'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', checkValidity);
+    });
+    checkValidity();
+
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        if (!checkValidity()) {
+            showStatus('Please fill in all required fields.', 'error');
+            return;
+        }
+
+        submitBtn.disabled   = true;
+        btnText.textContent  = 'Generating…';
+        btnSpinner.classList.remove('hidden');
+
+        fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        })
+        .then(async (r) => {
+            const html = await r.text();
+            // Server re-rendered the form → validation error, keep modal open
+            if (html.includes('id="generate-form"')) {
+                const body = document.getElementById('modal-generate-body');
+                body.innerHTML = html;
+                body.dataset.loaded = "1";
+                body.querySelectorAll('script').forEach(old => {
+                    const s = document.createElement('script');
+                    s.textContent = old.textContent;
+                    document.body.appendChild(s);
+                });
+                return;
+            }
+            // Redirect completed → success
+            document.getElementById('modal-generate').close();
+            window.location.reload();
+        })
+        .catch(() => {
+            showStatus('An error occurred. Please try again.', 'error');
+            btnText.textContent = 'Generate';
+            btnSpinner.classList.add('hidden');
+            checkValidity();
+        });
+    });
+})();
+</script>

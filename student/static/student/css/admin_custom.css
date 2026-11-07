@@ -1,0 +1,25 @@
+/* Extra space between Add button (left) and Import/Export (right) */
+.object-tools-wrapper {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 100px;  /* <-- increase this number to make more space */
+}
+
+/* Optional: style import/export buttons nicely */
+.import-export-buttons .button {
+    margin-left: 5px;
+    padding: 4px 10px;
+    font-size: 0.95rem;
+}
+
+/* Responsive layout for small screens */
+@media (max-width: 600px) {
+    .object-tools-wrapper {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .import-export-buttons {
+        margin-top: 10px; /* space below Add button */
+    }
+}

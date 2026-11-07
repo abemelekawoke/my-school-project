@@ -1,0 +1,112 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{{ title }} | {% trans "UoGHRRP" %}{% endblock %}
+
+{% block extrastyle %}
+<link rel="stylesheet" type="text/css" href="{% static 'css/custom_admin.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static "admin/admin_color.css" %}" />
+<style>
+    /* Shrinks the width of the changelist filter sidebar to save space */
+    #changelist-filter {
+        width: 200px !important; /* Adjust this value (e.g., 180px or 220px) as needed */
+        min-width: 180px !important;
+    }
+</style>
+{{ block.super }}
+{% endblock %}
+
+{% block branding %}
+<div style="display: flex; align-items: center;">
+    <!-- Left side logo and POSMS -->
+    <div style="display: flex; align-items: center;">
+        <a href="{% url 'admin:index' %}">
+            {% comment %} <img src="{% static 'logo.png' %}" alt="Left custom_admin" style="height: 45px; margin-right: 10px;" /> {% endcomment %}
+        </a>
+        <a href="{% url 'admin:index' %}">
+            <h1 id="site-name" style="margin-right: 10px;">{% trans "UoG HR Reporting Tool" %}</h1>
+        </a>    
+    </div>
+    <div style="display: flex; align-items: center;"> 
+        <a href="{% url 'admin:index' %}">      
+            {% comment %} <img src="{% static '' %}" alt="Right Logo" style="height: 45px;" /> {% endcomment %}
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+{{ block.super }}
+<style>      
+    .developers-footer {
+        margin-top: 30px;
+        padding: 15px;
+        text-align: center;
+        border-top: 1px solid #ddd;
+        font-size: 0.9rem;
+        box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
+    }
+    
+    .developers-title {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+    
+    .developers-list {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px 20px;
+        margin-top: 8px;
+    }
+    
+    .developer-name {
+        position: relative;
+        padding: 3px 10px;
+        background-color: #e9ecef;
+        border-radius: 15px;
+        color: #495057;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .developer-name:hover {
+        background-color: #dee2e6;
+        transform: translateY(-2px);
+    }
+    
+    .developer-image {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        display: none;
+        z-index: 1000;
+    }
+    
+    .developer-name:hover .developer-image {
+        display: block;
+    }
+</style>
+
+<div class="developers-footer">
+    <div class="developers-title">Developer</div>
+    <div class="developers-list">
+        <span class="developer-name">
+            Zemenu Tadele Awoke
+            <img class="developer-image" src="{% static 'developers/zemenu.jpg' %}" alt="Zemenu">
+        </span>
+        
+    </div>
+</div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

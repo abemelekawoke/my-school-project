@@ -1,0 +1,37 @@
+{% load i18n %}
+
+<div class="clearance-modal" id="clearanceModal" data-modal="1">
+    <div class="modal-header">
+        <span>የመውጫ ቅጽ &mdash; {{ student.Full_name }}</span>
+        <button type="button"
+                class="modal-close"
+                data-modal-close
+                aria-label="Close">&times;</button>
+    </div>
+
+    <form method="post"
+          action="{% url 'admin:student_clearance_form' student.id %}"
+          id="clearanceForm">
+        {% csrf_token %}
+        <div class="modal-body">
+            {% for field in form %}
+                <div class="form-row">
+                    <label for="{{ field.id_for_label }}" class="underlined-label">
+                        {{ field.label }}፡
+                    </label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <div class="field-error">{{ field.errors }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="modal-footer">
+            <button type="button"
+                    class="btn btn-secondary"
+                    data-modal-close>ሰርዝ</button>
+            <button type="submit" class="btn btn-primary">አስቀምጥ</button>
+        </div>
+    </form>
+</div>

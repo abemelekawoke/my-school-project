@@ -1,0 +1,25 @@
+/* static/admin/css/subject_admin.css */
+.select-all-checkbox {
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+#select-all-label {
+    color: #007bff;
+    cursor: pointer;
+    font-weight: bold;
+    margin-bottom: 10px;
+    display: inline-block;
+}
+
+#select-all-label:hover {
+    text-decoration: underline;
+}
+
+.grade-level-checkboxes {
+    margin-top: 10px;
+}
+
+.grade-row {
+    margin-bottom: 5px;
+}

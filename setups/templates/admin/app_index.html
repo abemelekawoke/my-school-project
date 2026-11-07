@@ -1,0 +1,24 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div style="text-align: center; padding: 50px;">
+    <h1>Setups Dashboard</h1>
+    <p>All setup models listed here</p>
+    
+    {% if app_list %}
+        {% for app in app_list %}
+            {% for model in app.models %}
+                <div style="background: white; margin: 10px; padding: 15px; display: inline-block; width: 200px;">
+                    <h3>{{ model.name }}</h3>
+                    <div>
+                        <a href="{{ model.admin_url }}">View</a> | 
+                        <a href="{{ model.add_url }}">Add</a>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endfor %}
+    {% else %}
+        <p>No models found.</p>
+    {% endif %}
+</div>
+{% endblock %}

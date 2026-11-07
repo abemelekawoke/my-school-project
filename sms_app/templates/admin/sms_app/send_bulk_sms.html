@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+  <h1>Send SMS</h1>
+  <p>Recipients: {{ parents|length }} parent(s)</p>
+  <form method="post">
+    {% csrf_token %}
+    <p>
+      <label for="message">Message:</label><br>
+      <textarea id="message" name="message" rows="6" cols="60" required></textarea>
+    </p>
+    <input type="hidden" name="apply" value="1">
+    <input type="submit" value="Send now">
+    <a href="{% url 'admin:sms_app_parent_changelist' %}">Cancel</a>
+  </form>
+{% endblock %}

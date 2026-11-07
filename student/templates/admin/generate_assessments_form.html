@@ -1,0 +1,384 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui/dist/full.css" rel="stylesheet">
+</head>
+<body class="p-6">
+
+<h2 class="text-xl font-bold mb-6">{{ title }}</h2>
+
+<form method="post" id="generate-form" novalidate>
+    {% csrf_token %}
+
+    <!-- Grade Field -->
+    <div class="mb-5">
+        <label class="block mb-2 font-medium text-gray-700">
+            Grade <span class="text-red-500">*</span>
+        </label>
+        <select name="grade" id="id_grade" class="select select-bordered w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+            <option value="" disabled selected>Select Grade</option>
+            {% for value, label in form.grade.field.choices %}
+                <option value="{{ value }}" {% if form.grade.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+        {% if form.grade.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.grade.errors.0 }}</p>
+        {% endif %}
+        <p class="text-red-500 text-sm mt-1 hidden" id="grade-error">Please select a grade</p>
+    </div>
+
+    <!-- Subject Field -->
+    <div class="mb-5">
+        <label class="block mb-2 font-medium text-gray-700">
+            Subject <span class="text-red-500">*</span>
+        </label>
+        <select name="subject" id="id_subject" class="select select-bordered w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+            <option value="" disabled selected>Select Subject</option>
+            {% for value, label in form.subject.field.choices %}
+                <option value="{{ value }}" {% if form.subject.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+        {% if form.subject.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.subject.errors.0 }}</p>
+        {% endif %}
+        <p class="text-red-500 text-sm mt-1 hidden" id="subject-error">Please select a subject</p>
+    </div>
+
+    <!-- Academic Year Field -->
+    <div class="mb-5">
+        <label class="block mb-2 font-medium text-gray-700">
+            Academic Year <span class="text-red-500">*</span>
+        </label>
+        <select name="academic_year" id="id_academic_year" class="select select-bordered w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+            <option value="" disabled selected>Select Academic Year</option>
+            {% for value, label in form.academic_year.field.choices %}
+                <option value="{{ value }}" {% if form.academic_year.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+        {% if form.academic_year.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.academic_year.errors.0 }}</p>
+        {% endif %}
+        <p class="text-red-500 text-sm mt-1 hidden" id="academic-year-error">Please select an academic year</p>
+    </div>
+
+    <!-- Term Field -->
+    <div class="mb-5">
+        <label class="block mb-2 font-medium text-gray-700">
+            Term <span class="text-red-500">*</span>
+        </label>
+        <select name="term" id="id_term" class="select select-bordered w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+            <option value="" disabled selected>Select Term</option>
+            {% for value, label in form.term.field.choices %}
+                <option value="{{ value }}" {% if form.term.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+        {% if form.term.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.term.errors.0 }}</p>
+        {% endif %}
+        <p class="text-red-500 text-sm mt-1 hidden" id="term-error">Please select a term</p>
+    </div>
+
+    <!-- Form Status Messages -->
+    <div id="form-status" class="hidden mb-4 p-3 rounded text-sm"></div>
+
+    <!-- Buttons -->
+    <div class="flex justify-between mt-8 pt-6 border-t">
+        <button type="submit" id="submit-btn" class="btn btn-primary px-6" disabled>
+            <span id="btn-text">Generate</span>
+            <span id="btn-spinner" class="hidden ml-2">
+                <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </span>
+        </button>
+        <a href="{% url 'admin:student_studentassessment_changelist' %}" class="btn btn-outline px-6">Cancel</a>
+    </div>
+</form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('generate-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+        const formStatus = document.getElementById('form-status');
+        
+        // Get all select fields
+        const gradeField = document.getElementById('id_grade');
+        const subjectField = document.getElementById('id_subject');
+        const academicYearField = document.getElementById('id_academic_year');
+        const termField = document.getElementById('id_term');
+        
+        const selectFields = [gradeField, subjectField, academicYearField, termField];
+        
+        // Initialize form
+        function initializeForm() {
+            // Set submit button to disabled initially
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            // Clear any existing errors
+            clearAllErrors();
+            
+            // Reset form status
+            formStatus.classList.add('hidden');
+            formStatus.textContent = '';
+            
+            // Reset button state
+            btnText.textContent = 'Generate';
+            btnSpinner.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            // Check initial validity
+            checkFormValidity();
+        }
+        
+        // Show error for a specific field
+        function showError(field, errorId) {
+            field.classList.add('select-error');
+            const errorElement = document.getElementById(errorId);
+            if (errorElement) {
+                errorElement.classList.remove('hidden');
+            }
+        }
+        
+        // Clear error for a specific field
+        function clearError(field, errorId) {
+            field.classList.remove('select-error');
+            const errorElement = document.getElementById(errorId);
+            if (errorElement) {
+                errorElement.classList.add('hidden');
+            }
+        }
+        
+        // Clear all errors
+        function clearAllErrors() {
+            selectFields.forEach(field => {
+                field.classList.remove('select-error');
+            });
+            ['grade-error', 'subject-error', 'academic-year-error', 'term-error'].forEach(errorId => {
+                const errorElement = document.getElementById(errorId);
+                if (errorElement) {
+                    errorElement.classList.add('hidden');
+                }
+            });
+        }
+        
+        // Check if all fields are valid
+        function checkFormValidity() {
+            const isGradeValid = gradeField && gradeField.value !== "";
+            const isSubjectValid = subjectField && subjectField.value !== "";
+            const isYearValid = academicYearField && academicYearField.value !== "";
+            const isTermValid = termField && termField.value !== "";
+            
+            const allValid = isGradeValid && isSubjectValid && isYearValid && isTermValid;
+            
+            if (allValid) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+            
+            return allValid;
+        }
+        
+        // Validate all fields and show errors
+        function validateForm() {
+            let isValid = true;
+            
+            // Clear previous errors
+            clearAllErrors();
+            
+            // Validate each field
+            if (!gradeField.value) {
+                showError(gradeField, 'grade-error');
+                isValid = false;
+            }
+            
+            if (!subjectField.value) {
+                showError(subjectField, 'subject-error');
+                isValid = false;
+            }
+            
+            if (!academicYearField.value) {
+                showError(academicYearField, 'academic-year-error');
+                isValid = false;
+            }
+            
+            if (!termField.value) {
+                showError(termField, 'term-error');
+                isValid = false;
+            }
+            
+            return isValid;
+        }
+        
+        // Show form status message
+        function showStatus(message, type = 'error') {
+            formStatus.textContent = message;
+            formStatus.className = `mb-4 p-3 rounded text-sm ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            formStatus.classList.remove('hidden');
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    formStatus.classList.add('hidden');
+                }, 5000);
+            }
+        }
+        
+        // Add change event listeners to all select fields
+        selectFields.forEach(field => {
+            if (field) {
+                field.addEventListener('change', function() {
+                    // Clear error for this field when user selects something
+                    const fieldName = this.id.replace('id_', '').replace(/_/g, '-');
+                    const errorId = `${fieldName}-error`;
+                    clearError(this, errorId);
+                    
+                    // Check overall form validity
+                    checkFormValidity();
+                    
+                    // If still empty after change, show error
+                    if (!this.value) {
+                        showError(this, errorId);
+                        submitBtn.disabled = true;
+                        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    }
+                });
+            }
+        });
+        
+        // Form submission handler
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Validate form
+            const isValid = validateForm();
+            
+            if (!isValid) {
+                showStatus('Please fill in all required fields before generating assessments.', 'error');
+                return false;
+            }
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            btnText.textContent = 'Generating...';
+            btnSpinner.classList.remove('hidden');
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            // Clear any previous status
+            formStatus.classList.add('hidden');
+            
+            // Submit form using Fetch API for better UX
+            const formData = new FormData(form);
+            
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'  // Optional: for Django to detect AJAX
+                }
+            })
+            .then(response => {
+                if (response.redirected) {
+                    // If Django redirects (on success), follow the redirect
+                    window.location.href = response.url;
+                    return;
+                }
+                return response.text();
+            })
+            .then(data => {
+                if (data) {
+                    // Handle response if not redirected
+                    showStatus('Assessments generated successfully!', 'success');
+                    
+                    // Reset form after successful submission
+                    setTimeout(() => {
+                        form.reset();
+                        initializeForm();
+                    }, 1500);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showStatus('An error occurred. Please try again.', 'error');
+                
+                // Reset button state
+                btnText.textContent = 'Generate';
+                btnSpinner.classList.add('hidden');
+                checkFormValidity(); // Re-enable button if form is valid
+            });
+            
+            return false;
+        });
+        
+        // Initialize form on page load
+        initializeForm();
+        
+        // Also check validity on page load in case fields are pre-filled
+        window.addEventListener('load', function() {
+            setTimeout(checkFormValidity, 100);
+        });
+    });
+</script>
+
+<style>
+    /* Custom styles for better UX */
+    .select-error {
+        border-color: #ef4444 !important;
+        border-width: 2px !important;
+        background-color: #fef2f2 !important;
+    }
+    
+    .select-error:focus {
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+    }
+    
+    .btn:disabled {
+        cursor: not-allowed !important;
+        opacity: 0.5 !important;
+    }
+    
+    /* Improve select dropdown appearance */
+    .select-bordered {
+        transition: all 0.2s ease;
+    }
+    
+    .select-bordered:hover:not(.select-error) {
+        border-color: #9ca3af;
+    }
+    
+    /* Style for required field asterisk */
+    .text-red-500 {
+        font-weight: bold;
+    }
+    
+    /* Button loading state */
+    .btn-primary:disabled {
+        background-color: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+    }
+    
+    /* Form status message styling */
+    #form-status {
+        transition: all 0.3s ease;
+    }
+</style>
+
+</body>
+</html>
