@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'student',
     # 'revenue',
     'sales',
-    'purchases',
+    # 'purchases',
     'process',
     'reports',
     'sms_app',
@@ -172,7 +172,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DAISY_SETTINGS = {
     'SITE_LOGO': '/static/images/my_logo.png',
-    'SHOW_CHANGELIST_FILTER': True,
+    # 'SHOW_CHANGELIST_FILTER': True,
     'APPS_ICONS': {
         'employees': 'fas fa-users',
         'humanresource': 'fas fa-user-tie',

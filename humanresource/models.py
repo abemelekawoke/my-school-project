@@ -80,6 +80,13 @@ class StaffProfile(models.Model):
     salary = models.DecimalField('ደሞዝ', max_digits=10, decimal_places=2, default=0.00)
     employee_status = models.CharField('የስራ ሁኔታ', max_length=10, choices=EMPLOYEE_STATUS_CHOICES, default='active')
     profile_picture = models.ImageField('ፎቶ ግራፍ', upload_to='profile_pictures/', blank=True, null=True)
+    signature = models.ImageField(
+            'ፊርማ',
+            upload_to='staff_signatures/',
+            blank=True,
+            null=True,
+            help_text='Upload a scanned signature image (PNG with transparent background recommended)',
+        )
     registered_at = models.DateTimeField(auto_now_add=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
     registered_by = models.ForeignKey(User, related_name='staff_registered', on_delete=models.SET_NULL, null=True, blank=True)
@@ -146,6 +153,13 @@ class AdminStaffProfile(models.Model):
     salary = models.DecimalField('ደሞዝ', max_digits=10, decimal_places=2, default=0.00)
     employee_status = models.CharField('የስራ ሁኔታ', max_length=10, choices=EMPLOYEE_STATUS_CHOICES, default='active')
     profile_picture = models.ImageField('ፎቶ ግራፍ', upload_to='profile_pictures/', blank=True, null=True)
+    signature = models.ImageField(
+            'ፊርማ',
+            upload_to='admin_staff_signatures/',
+            blank=True,
+            null=True,
+            help_text='Upload a scanned signature image (PNG with transparent background recommended)',
+        )
     registered_at = models.DateTimeField(auto_now_add=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
     registered_by = models.ForeignKey(User, related_name='admin_staff_registered', on_delete=models.SET_NULL, null=True, blank=True)

@@ -13,11 +13,23 @@ from django.utils.html import format_html
 from django.urls import reverse
 from import_export.admin import ExportMixin
 
+from django.contrib import admin
+from django.urls import reverse
+from django.utils.html import format_html
+from import_export.admin import ImportExportModelAdmin
+
+from .models import StaffProfile, AdminStaffProfile, Experience
+
+
 class ExperienceInlineAdmin(admin.TabularInline):
     model = Experience
-    extra = 1
+    extra = 0
     readonly_fields = ['id', 'net_duration']
 
+
+# =====================================================================
+# StaffAdmin  (Academic Staff)
+# =====================================================================
 class StaffAdmin(ImportExportModelAdmin):
     inlines = [ExperienceInlineAdmin]
 
@@ -26,7 +38,8 @@ class StaffAdmin(ImportExportModelAdmin):
         "print_employee_experience", "position", "colored_status", "hired_date"
     )
     list_filter = (
-        "school", "work_cycles", "employee_status", "marital_status", "position", "gender", "educational_level"
+        "school", "work_cycles", "employee_status", "marital_status",
+        "position", "gender", "educational_level"
     )
     list_display_links = (
         "full_name_am", "full_name_en", 'gender',
@@ -34,50 +47,63 @@ class StaffAdmin(ImportExportModelAdmin):
     )
     search_fields = ("full_name_am", "full_name_en", "position", "contact_number")
     ordering = ("-registered_at",)
-    save_on_top = True  # Show save buttons at the top of the form
+    save_on_top = True
+
     readonly_fields = (
-        "registered_at", "updated_at", "updated_by", "registered_by", "student_image_preview_on_form"
+        "registered_at", "updated_at", "updated_by", "registered_by",
+        "student_image_preview_on_form",
+        "signature_preview",
     )
-    
-    # autocomplete_fields = (
-    #     "department",
-    # )
 
     fieldsets = (
         ("Personal Information", {
             "fields": (
-                ("full_name_am", "full_name_en"), ("gender",
-                "date_of_birth"), ("nationality", "marital_status"), ("contact_number", "email")
+                ("full_name_am", "full_name_en"),                    # 2 per row
+                ("gender", "date_of_birth", "marital_status"),       # 3 per row
+                ("nationality", "contact_number", "email"),          # 3 per row
             ),
             "classes": ("wide",),
         }),
         ("Employment Details", {
             "fields": (
-                ("hired_date"), ("school", "work_cycles"), ("career_growth", "previous_growth_hired"), ("job_grade", "position"), ("salary", "employee_status")
+                ("hired_date", "school", "work_cycles"),             # 3 per row
+                ("career_growth", "previous_growth_hired"),          # 2 per row
+                ("job_grade", "position", "employee_status"),        # 3 per row
+                "salary",                                            # 1 per row
             ),
         }),
         ("Education", {
-            "fields": ("teaching_certificate", "specialization", "educational_level"), 
+            "fields": (
+                ("teaching_certificate", "specialization", "educational_level"),  # 3 per row
+            ),
             "classes": ("collapse",),
         }),
         ("Tracking Information", {
-            "fields": (("updated_at", "registered_by", "updated_by")),  # ✅ removed 'registered_at'
+            "fields": (
+                ("registered_at", "updated_at"),                     # 2 per row
+                ("registered_by", "updated_by"),                     # 2 per row
+            ),
             "classes": ("collapse",),
         }),
-        ('Staff Images', {
-            'fields': ('profile_picture',)
+        ("Staff Images", {
+            "fields": (
+                ("profile_picture", "signature"),                    # 2 per row
+            ),
         }),
-        ('Image Preview', {
-            'fields': ('student_image_preview_on_form',)
+        ("Image Preview", {
+            "fields": (
+                ("student_image_preview_on_form", "signature_preview"),   # 2 per row
+            ),
         }),
     )
 
+    # ── previews ─────────────────────────────────────────────────────
     def student_image_preview(self, obj):
         if obj.profile_picture:
             return format_html(
                 '<a href="{}" target="_blank"><img src="{}" style="height: 50px;"/></a>',
                 obj.profile_picture.url,
-                obj.profile_picture.url
+                obj.profile_picture.url,
             )
         return "No Image"
     student_image_preview.short_description = "Student Image"
@@ -86,15 +112,26 @@ class StaffAdmin(ImportExportModelAdmin):
         if obj.profile_picture:
             return format_html(
                 '<img src="{}" style="max-height: 300px; max-width: 300px;"/>',
-                obj.profile_picture.url
+                obj.profile_picture.url,
             )
         return "No Image"
     student_image_preview_on_form.short_description = "Image Preview"
 
+    @admin.display(description='Signature')
+    def signature_preview(self, obj):
+        if obj.signature:
+            return format_html(
+                '<img src="{}" style="max-height:120px;max-width:300px;'
+                'border:1px solid #ccc;padding:4px;background:#fff;" />',
+                obj.signature.url,
+            )
+        return '—'
+
+    # ── misc ─────────────────────────────────────────────────────────
     def print_employee_experience(self, obj):
         return format_html(
             '<a href="{}" target="_blank">Print</a>',
-            reverse('print_employee_experience', args=[obj.pk])
+            reverse('print_employee_experience', args=[obj.pk]),
         )
     print_employee_experience.short_description = "Print"
 
@@ -103,12 +140,12 @@ class StaffAdmin(ImportExportModelAdmin):
             "active": "green",
             "inactive": "gray",
             "terminated": "red",
-            "retired": "blue"
+            "retired": "blue",
         }
         return format_html(
             '<span style="color: {};">{}</span>',
             colors.get(obj.employee_status, "black"),
-            obj.employee_status
+            obj.employee_status,
         )
     colored_status.admin_order_field = "employee_status"
     colored_status.short_description = "Status"
@@ -119,13 +156,14 @@ class StaffAdmin(ImportExportModelAdmin):
         else:
             obj.registered_by = request.user
         obj.save()
-    # class Media:
-    #     css = {
-    #         'all': ('css/admin_custom.css',)  # Path to your custom CSS file
-    #     }
+
 
 admin.site.register(StaffProfile, StaffAdmin)
 
+
+# =====================================================================
+# AdminStaffProfileAdmin  (Admin Staff)
+# =====================================================================
 class AdminStaffProfileAdmin(ImportExportModelAdmin):
     inlines = [ExperienceInlineAdmin]
 
@@ -143,7 +181,7 @@ class AdminStaffProfileAdmin(ImportExportModelAdmin):
         'rank',
         'salary',
         'employee_status',
-        'hired_date'
+        'hired_date',
     )
 
     list_display_links = (
@@ -160,11 +198,12 @@ class AdminStaffProfileAdmin(ImportExportModelAdmin):
         'rank',
         'salary',
         'employee_status',
-        'hired_date'
+        'hired_date',
     )
+
     list_filter = (
-        'gender', 'school', 'employee_status', 
-        'marital_status', 'educational_level', 'job_grade'
+        'gender', 'school', 'employee_status',
+        'marital_status', 'educational_level', 'job_grade',
     )
 
     search_fields = ('full_name_am', 'full_name_en', 'job_title', 'email', 'contact_number')
@@ -172,42 +211,55 @@ class AdminStaffProfileAdmin(ImportExportModelAdmin):
     readonly_fields = (
         'registered_at',
         'updated_at',
-        'student_image_preview_on_form',  # Add this here
+        'student_image_preview_on_form',
+        'signature_preview',
     )
-    save_on_top = True  # Show save buttons at the top of the form
+
+    save_on_top = True
+
     fieldsets = (
-        ('(Personal Information)', {
-            'fields': ('full_name_am', 'full_name_en', 'gender', 'date_of_birth', 'marital_status', 'nationality')
-        }),
-        ('(Employment Information)', {
+        ('Personal Information', {
             'fields': (
-                'school', 'job_title', 'new_job_code', 'job_grade', 'rank',
-                'educational_level', 'position', 'salary', 'employee_status', 'hired_date'
+                ('full_name_am', 'full_name_en'),                    # 2 per row
+                ('gender', 'date_of_birth', 'marital_status'),       # 3 per row
+                ('nationality', 'contact_number', 'email'),          # 3 per row
+            ),
+        }),
+        ('Employment Information', {
+            'fields': (
+                ('school', 'job_title', 'new_job_code'),             # 3 per row
+                ('job_grade', 'rank', 'educational_level'),          # 3 per row
+                ('position', 'salary', 'employee_status'),           # 3 per row
+                'hired_date',                                        # 1 per row
             ),
             "classes": ("collapse",),
         }),
-        ('(Contact Info)', {
-            'fields': ('contact_number', 'email'),
-            "classes": ("collapse",),
-        }),
-        ('(Audit Trail)', {
-            'fields': ('registered_at', 'updated_at', 'registered_by', 'updated_by'),
+        ('Audit Trail', {
+            'fields': (
+                ('registered_at', 'updated_at'),                     # 2 per row
+                ('registered_by', 'updated_by'),                     # 2 per row
+            ),
             "classes": ("collapse",),
         }),
         ('Staff Images', {
-            'fields': ('profile_picture',)
+            'fields': (
+                ('profile_picture', 'signature'),                    # 2 per row
+            ),
         }),
         ('Image Preview', {
-            'fields': ('student_image_preview_on_form',)
+            'fields': (
+                ('student_image_preview_on_form', 'signature_preview'),  # 2 per row
+            ),
         }),
     )
 
+    # ── previews ─────────────────────────────────────────────────────
     def student_image_preview(self, obj):
         if obj.profile_picture:
             return format_html(
                 '<a href="{}" target="_blank"><img src="{}" style="height: 50px;"/></a>',
                 obj.profile_picture.url,
-                obj.profile_picture.url
+                obj.profile_picture.url,
             )
         return "No Image"
     student_image_preview.short_description = "Student Image"
@@ -216,15 +268,26 @@ class AdminStaffProfileAdmin(ImportExportModelAdmin):
         if obj.profile_picture:
             return format_html(
                 '<img src="{}" style="max-height: 300px; max-width: 300px;"/>',
-                obj.profile_picture.url
+                obj.profile_picture.url,
             )
         return "No Image"
     student_image_preview_on_form.short_description = "Image Preview"
 
+    @admin.display(description='Signature')
+    def signature_preview(self, obj):
+        if obj.signature:
+            return format_html(
+                '<img src="{}" style="max-height:120px;max-width:300px;'
+                'border:1px solid #ccc;padding:4px;background:#fff;" />',
+                obj.signature.url,
+            )
+        return '—'
+
+    # ── misc ─────────────────────────────────────────────────────────
     def print_admin_experience(self, obj):
         return format_html(
             '<a href="{}" target="_blank">Print</a>',
-            reverse('print_admin_experience', args=[obj.pk])
+            reverse('print_admin_experience', args=[obj.pk]),
         )
     print_admin_experience.short_description = "Print"
 
@@ -233,12 +296,12 @@ class AdminStaffProfileAdmin(ImportExportModelAdmin):
             "active": "green",
             "inactive": "gray",
             "terminated": "red",
-            "retired": "blue"
+            "retired": "blue",
         }
         return format_html(
             '<span style="color: {};">{}</span>',
             colors.get(obj.employee_status, "black"),
-            obj.employee_status
+            obj.employee_status,
         )
     colored_status.admin_order_field = "employee_status"
     colored_status.short_description = "Status"
@@ -249,7 +312,10 @@ class AdminStaffProfileAdmin(ImportExportModelAdmin):
         else:
             obj.registered_by = request.user
         obj.save()
+
+
 admin.site.register(AdminStaffProfile, AdminStaffProfileAdmin)
+
 class LeaveRequestAdmin(admin.ModelAdmin):
     list_display = ('employee', 'leave_type', 'print_leave_request', 'start_date', 'end_date', 'status', 'created_at', 'updated_at')
     list_filter = ('leave_type', 'status', 'created_at')

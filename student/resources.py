@@ -16,9 +16,15 @@ class StudentAssessmentScoreResource(resources.ModelResource):
     class Meta:
         model = StudentAssessmentScore
         fields = (
+            'id',
             'student',
             'subject',
+            'student_assessment',
             'weight',
+            'grade',
+            'section',
+            'term',
+            'academic_year',
             'raw_score',
             'weighted_score',
         )

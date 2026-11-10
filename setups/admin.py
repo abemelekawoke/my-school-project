@@ -229,21 +229,37 @@ admin.site.get_app_list = _patched_get_app_list.__get__(admin.site, AdminSite)
 
 # custom_admin_site.register(LogEntry, LogEntryAdmin)
 
+from django.contrib import admin
+from django.db import transaction
+from django.utils.translation import gettext_lazy as _
+from import_export.admin import ImportExportModelAdmin
+
+from .models import ReportHeader, Year
+
+
 @admin.register(ReportHeader)
 class ReportHeaderAdmin(ImportExportModelAdmin):
+    """
+    Admin for ReportHeader.
+
+    Business rule: at most one *active* ReportHeader may exist per
+    academic year. Activating one silently deactivates the others.
+    """
+
+    # ── List view ────────────────────────────────────────────────────
     list_display = (
         "school_name",
         "academic_year",
-        "archive_officer",
-        "school_director",
-        "is_active",
+        "archive_officer_display",
+        "school_director_display",
+        "active_badge",
         "created_at",
     )
-
-    list_filter = (
-        "academic_year",
-        "is_active",
-    )
+    list_display_links = ("school_name",)
+    list_filter = ("academic_year", "is_active")
+    list_select_related = ("archive_officer", "school_director")
+    list_per_page = 50
+    ordering = ("-academic_year", "-created_at")
 
     search_fields = (
         "school_name",
@@ -254,64 +270,94 @@ class ReportHeaderAdmin(ImportExportModelAdmin):
         "school_director__full_name_am",
     )
 
-    autocomplete_fields = (
-        "archive_officer",
-        "school_director",
-    )
-
-    readonly_fields = (
-        "created_at",
-    )
-
+    # ── Form view ────────────────────────────────────────────────────
+    autocomplete_fields = ("archive_officer", "school_director")
+    readonly_fields = ("created_at",)
     save_on_top = True
 
+    # Tuples inside "fields" = one row. "wide" = multi-column row.
     fieldsets = (
-        ("የት/ት ቤት መረጃ", {
-            "fields": (
-                "school_name",
-                "education_bureau",
-                "city_admin",
-                "academic_year",
-            )
-        }),
-        ("የኃላፊዎች መረጃ", {
-            "fields": (
-                "archive_officer",
-                "school_director",
-            )
-        }),
-        ("ሁኔታ", {
-            "fields": (
-                "is_active",
-                "created_at",
-            )
-        }),
+        (
+            _("የት/ት ቤት መረጃ"),
+            {
+                "fields": (
+                    ("school_name", "academic_year"),
+                    ("education_bureau", "city_admin"),
+                ),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("የኃላፊዎች መረጃ"),
+            {
+                "fields": (
+                    ("archive_officer", "school_director"),
+                ),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("ሁኔታ"),
+            {
+                "fields": (
+                    ("is_active", "created_at"),
+                ),
+                "classes": ("wide", "collapse"),
+            },
+        ),
     )
 
-    ordering = ("-academic_year",)
+    # ── Display helpers ──────────────────────────────────────────────
+    @admin.display(
+        description=_("Archive officer"),
+        ordering="archive_officer__full_name_en",
+    )
+    def archive_officer_display(self, obj):
+        return obj.archive_officer or "—"
 
+    @admin.display(
+        description=_("School director"),
+        ordering="school_director__full_name_en",
+    )
+    def school_director_display(self, obj):
+        return obj.school_director or "—"
+
+    @admin.display(description=_("Active"), boolean=True, ordering="is_active")
+    def active_badge(self, obj):
+        return obj.is_active
+
+    # ── Persistence hooks ────────────────────────────────────────────
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
-        """
-        Ensure only ONE active ReportHeader per academic year.
-        """
+        """Guarantee a single active ReportHeader per academic year."""
         if obj.is_active:
-            ReportHeader.objects.filter(
-                academic_year=obj.academic_year,
-                is_active=True
-            ).exclude(pk=obj.pk).update(is_active=False)
-
+            (
+                ReportHeader.objects
+                .filter(academic_year=obj.academic_year, is_active=True)
+                .exclude(pk=obj.pk)
+                .update(is_active=False)
+            )
         super().save_model(request, obj, form, change)
-        
+
     def get_changeform_initial_data(self, request):
+        """Default the academic year to the currently active Year."""
         initial = super().get_changeform_initial_data(request)
         active_year = Year.objects.filter(status="Active").first()
         if active_year:
             initial["academic_year"] = active_year
         return initial
+
+    # ── Queryset tuning ──────────────────────────────────────────────
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("archive_officer", "school_director")
+        )
     
 class GradeAdmin(ImportExportModelAdmin):
     # pass
-    fields = ['code', 'name', 'description']
+    fields = [('code', 'name'), 'description']
     list_display = ['id', 'code', 'name', 'description']
     search_fields = ['name', 'code', 'description']
     list_filter = ['name']
@@ -334,7 +380,7 @@ admin.site.register(Grade, GradeAdmin)
 
 class SectionAdmin(ImportExportModelAdmin):
     # pass
-    fields = [('name'), ('description')]
+    fields = [('name', 'description')]
     list_display = ['name', 'description']
     search_fields = ['name', 'description']
     list_filter = ['name']
@@ -365,6 +411,7 @@ admin.site.register(Section, SectionAdmin)
 #     ordering = ('subject__name', 'grade__name')
 @admin.register(Stream)
 class StreamAdmin(ImportExportModelAdmin):
+    fields = [('name', 'status')]
     list_display = ('id', 'colored_name', 'status')   # Show colored labels instead of plain text
     list_filter = ('name',)            # Sidebar filter
     search_fields = ('name',)          # Search box
@@ -414,7 +461,7 @@ class SubjectAdmin(ImportExportModelAdmin):
     # Form layout
     fieldsets = (
         ("Subject Information", {
-            "fields": ("name", "code", "stream", "description")
+            "fields": (("name", "code"), ("stream", "description"))
         }),
         ("Grade Assignment", {
             "fields": ("grade_levels",),
@@ -549,13 +596,13 @@ class TeacherAssignmentAdmin(ImportExportModelAdmin):
     fieldsets = (
         ('Teacher Assignment', {
             'fields': (
-                'teacher',
-                'academic_year',
+                ('teacher',
+                'academic_year'),
                 'is_section_head',
-                'grade',
-                'section',
-                'number_of_sessions',
-                'assigned_to',
+                ('grade',
+                'section'),
+                ('number_of_sessions',
+                'assigned_to'),
             )
         }),
         ('System Information', {
@@ -598,7 +645,7 @@ class AssessmentNameAdmin(ImportExportModelAdmin):
     # Field grouping for clarity
     fieldsets = (
         ("Basic Info", {
-            "fields": ("name", "category", "description")
+            "fields": (("name", "category"), "description")
         }),
         ("Defaults & Status", {
             "fields": ("is_active",)
@@ -720,8 +767,8 @@ class AssessmentFormulaAdmin(ImportExportModelAdmin):
     fieldsets = (
         ('Basic Information', {
             'fields': (
-                'name',
-                ('academic_year', 'is_active'),
+                ('name',
+                'academic_year'), 'is_active',
                 ('grade_level', 'subject')
             )
         }),
@@ -796,15 +843,15 @@ class TermAdmin(ImportExportModelAdmin):
     fieldsets = (
         ("Term Information", {
             "fields": (
-                "name",
-                "academic_year",
-                "is_active",
+                ("name",
+                "academic_year"),
             )
         }),
         ("Schedule", {
             "fields": (
-                "start_date",
-                "end_date",
+                ("start_date",
+                "end_date"),
+                "is_active",
             ),
             "classes": ("collapse",),  # collapsible section
         }),
@@ -834,7 +881,7 @@ class TermAdmin(ImportExportModelAdmin):
 
 class YearAdmin(ImportExportModelAdmin):
     # pass
-    fields = [('id'), ('year'), ('description'), 'status']
+    fields = [('id', 'year'), ('description', 'status')]
     list_display = ['id', 'year', 'description', 'status']
     search_fields = ['id', 'year', 'description', 'status']
     list_filter = ['year']

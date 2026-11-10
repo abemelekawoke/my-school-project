@@ -110,7 +110,7 @@ class StudentProfile(models.Model):
     cycle = models.CharField(max_length=50, choices=CYCLE_CHOICES, verbose_name='የት/ሳይክል', null=True, blank=True) 
 
     parent_contact = models.CharField('የወላጅ ስ/ቁጥር', max_length=25, null=True, blank=True)
-    # parent_job = models.CharField('የወላጅ ስራ', max_length=50, choices=parent_job, null=True, blank=True)
+    parent_job = models.CharField('የወላጅ ስራ', max_length=50, choices=parent_job, null=True, blank=True)
 
     # Transport_type = models.CharField('የትራንስፖርት ሁኔታ', max_length=50, choices=Transport_type)
     # Fermata = models.ForeignKey(Fermata, on_delete=models.DO_NOTHING, verbose_name='አድራሻ/ፌርማታ', null=True, blank=True)
@@ -146,54 +146,48 @@ class StudentProfile(models.Model):
         verbose_name_plural="Student profile"
         
 class AcademicHistory(models.Model):
+    STATUS_CHOICES = [
+        ('Promoted',    'Promoted'),
+        ('Repeated',    'Repeated'),
+        ('Transferred', 'Transferred'),
+        ('Dropped',     'Dropped'),
+        ('Completed',   'Completed'),
+        ('Graduated',   'Graduated'),   # ← NEW
+    ]
+
     student = models.ForeignKey(
-        'student.StudentProfile',  # adjust app name if needed
-        on_delete=models.CASCADE,
-        related_name='academic_histories'
-    )
-
-    academic_year = models.CharField(
-        max_length=9,  # e.g. 2023/2024
-        help_text="Format: YYYY/YYYY"
-    )
-
-    grade = models.CharField(
-        max_length=20,
-        help_text="Grade or Year Level (e.g. Grade 10, Year 2)"
-    )
-
-    section = models.CharField(
-        max_length=10,
+        'student.StudentProfile',
+        on_delete=models.SET_NULL,      # ← was CASCADE (critical)
+        null=True,
         blank=True,
-        null=True
+        db_column='STUDENT_ID',
+        related_name='academic_histories',
     )
 
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ('Promoted', 'Promoted'),
-            ('Repeated', 'Repeated'),
-            ('Transferred', 'Transferred'),
-            ('Dropped', 'Dropped'),
-        ],
-        default='Promoted'
-    )
+    # ── Snapshot fields (preserve identity after the profile is deleted) ──
+    student_name      = models.CharField(max_length=100, blank=True, default='', db_column='STUDENT_NAME')
+    student_name_en   = models.CharField(max_length=100, blank=True, default='', db_column='STUDENT_NAME_EN')
+    student_id_number = models.IntegerField(null=True, blank=True,             db_column='STUDENT_ID_NUMBER')
+    student_gender    = models.CharField(max_length=25,  blank=True, default='', db_column='STUDENT_GENDER')
+    student_dob       = models.DateField(null=True, blank=True,               db_column='STUDENT_DOB')
 
-    remark = models.TextField(
-        blank=True,
-        null=True
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
+    academic_year = models.CharField(max_length=9, db_column='ACADEMIC_YEAR')
+    grade         = models.CharField(max_length=20, db_column='GRADE')
+    section       = models.CharField(max_length=10, blank=True, null=True, db_column='SECTION')
+    status        = models.CharField(max_length=20, choices=STATUS_CHOICES,
+                                     default='Promoted', db_column='STATUS')
+    remark        = models.TextField(blank=True, null=True, db_column='REMARK')
+    created_at    = models.DateTimeField(auto_now_add=True, db_column='CREATED_AT')
 
     class Meta:
         ordering = ['student', 'academic_year']
         unique_together = ('student', 'academic_year')
         verbose_name = "Academic History"
         verbose_name_plural = "Academic Histories"
+        db_table = 'STUDENT_ACADEMICHISTORY'
 
     def __str__(self):
-        return f"{self.student} - {self.academic_year}"
+        return f"{self.student_name or self.student_id_number} - {self.academic_year}"
 
         
 class StudentAssessment(models.Model):
@@ -261,6 +255,7 @@ class StudentAssessmentScore(models.Model):
             return Year.objects.get(status__iexact="Active").year
         except Year.DoesNotExist:
             return None
+    id = models.AutoField(primary_key=True, unique=True)
 
     student = models.ForeignKey(
         StudentProfile, on_delete=models.SET_NULL, null=True,
@@ -570,8 +565,8 @@ class StudentStatistics(models.Model):
     class Meta:
         managed = False  # This is a database view, not a Django-managed table
         db_table = "student_statistics"  # Matches the name of the database view
-        verbose_name = "Student statistics"
-        verbose_name_plural = "Student statistics"
+        verbose_name = "Student by gender"
+        verbose_name_plural = "Student by gender"
 
     def __str__(self):
         return f"Grade {self.grade} - Section {self.section}: {self.total_students} Students"
@@ -614,8 +609,8 @@ class StudentResultAnalysisView(models.Model):
         managed = False
         db_table = "student_result_analysis_view"
         ordering = ("academic_year", "grade", "subject_name")
-        verbose_name = "Subject Score Analysis"
-        verbose_name_plural = "Subject Score Analysis"
+        verbose_name = "Subject based score analysis"
+        verbose_name_plural = "Subject based score analysis"
 
     def __str__(self):
         return f"{self.academic_year} • Grade {self.grade} • {self.subject_name}"
@@ -666,8 +661,8 @@ class StudentGradeLevelAnalysisView(models.Model):
         managed = False
         db_table = "student_grade_level_analysis_view"
         ordering = ("academic_year", "id")
-        verbose_name = "Grade Level Analysis"
-        verbose_name_plural = "Grade Level Analysis"
+        verbose_name = "Grade based score analysis"
+        verbose_name_plural = "Grade based score analysis"
 
     def __str__(self):
         return f"{self.academic_year} • {self.grade}"

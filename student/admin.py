@@ -145,7 +145,7 @@ class StudentProfileAdmin(ImportExportMixin, admin.ModelAdmin):
     # Organizing the fields into collapsible sections using fieldsets for better clarity
     fieldsets = (
         (None, {
-            'fields': (('Full_name', 'Full_name_en'), ('Gender', 'Date_of_birth'), ('admit_year', 'parent_contact'))
+            'fields': (('Full_name', 'Full_name_en'), ('Gender', 'Date_of_birth'), ('admit_year', 'parent_contact', 'parent_job'))
         }),
         ('Academic Information', { 
             'fields': (('academic_year', 'cycle'), ('New_grade', 'New_section'), ('Grade', 'Section'), ('status', 'school'))
@@ -647,88 +647,126 @@ class StudentProfileAdmin(ImportExportMixin, admin.ModelAdmin):
 # Register the StudentProfile model with the custom admin class
 admin.site.register(StudentProfile, StudentProfileAdmin)
 
+# your_app/student/admin.py
+
+from django.contrib import admin
+from django.urls import reverse
+from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
+
+from .models import AcademicHistory
+
+
 @admin.register(AcademicHistory)
 class AcademicHistoryAdmin(admin.ModelAdmin):
-    # 📌 Main list view
+    # ── Columns shown in the change list ──────────────────────────────
     list_display = (
-        'student_name',
+        'student_display',        # snapshot-first name w/ optional link
+        'student_id_number',
         'academic_year',
         'grade',
         'section',
-        'status_badge',
+        'status',
+        'is_archived',            # True when the profile was deleted
         'created_at',
     )
 
+    list_display_links = ('student_display', 'academic_year')
+
+    # ── Filters (sidebar) ─────────────────────────────────────────────
     list_filter = (
+        'status',
         'academic_year',
         'grade',
-        'status',
     )
 
+    # ── Search — must include snapshot fields because STUDENT_ID may be NULL ──
     search_fields = (
-        'student__full_name',
-        'student__student_id',
+        'student_name',
+        'student_name_en',
+        'student_id_number',
+        'student__Full_name',      # still works for non-archived rows
+        'student__Full_name_en',
         'academic_year',
+        'grade',
+        'section',
     )
-    
-    list_editable = ('grade', 'section',)
 
-    ordering = ('-academic_year', 'student')
+    # ── Ordering / pagination ────────────────────────────────────────
+    ordering = ('-academic_year', 'student_name')
+    # date_hierarchy = 'academic_year'          # YYYY/YYYY strings sort lexically
+    list_per_page = 50
 
-    date_hierarchy = 'created_at'
+    # ── Performance: fetch student in the same query ─────────────────
+    list_select_related = ('student',)
 
-    list_per_page = 20
+    # ── Detail form ──────────────────────────────────────────────────
+    # Snapshot fields are written by the SP — readonly in admin so a user
+    # can't accidentally desync them from the (possibly deleted) profile.
+    readonly_fields = (
+        'student_name',
+        'student_name_en',
+        'student_id_number',
+        'student_gender',
+        'student_dob',
+        'created_at',
+    )
 
-    # 📌 Form layout
     fieldsets = (
-        ('Student Information', {
-            'fields': ('student',)
+        (_('Student'), {
+            'fields': (
+                'student',
+                'student_name',
+                'student_name_en',
+                'student_id_number',
+                'student_gender',
+                'student_dob',
+            ),
         }),
-        ('Academic Details', {
+        (_('Academic record'), {
             'fields': (
                 'academic_year',
-                ('grade', 'section'),
-            )
+                'grade',
+                'section',
+                'status',
+                'remark',
+            ),
         }),
-        ('Status & Remarks', {
-            'fields': ('status', 'remark'),
+        (_('Audit'), {
             'classes': ('collapse',),
+            'fields': ('created_at',),
         }),
-    )# The above code is using Python to create a comment. In Python, comments are
-    # denoted by the "#" symbol, and they are used to provide explanations or notes
-    # within the code that are not executed by the interpreter. In this case, the
-    # comment appears to be indicating a score or rating using the "#" symbol
-    # repeated multiple times.
-    
+    )
 
-    autocomplete_fields = ('student',)
+    # ── Helpers ──────────────────────────────────────────────────────
+    @admin.display(description=_('Student'), ordering='student_name')
+    def student_display(self, obj):
+        """Snapshot name if present, else FK name, else '— (archived)'."""
+        name = obj.student_name or (obj.student.Full_name if obj.student_id else '')
+        if not name:
+            return format_html('<em style="color:#999">{}</em>', '— archived —')
 
-    readonly_fields = ('created_at',)
+        # Link to the profile if it still exists, otherwise plain text
+        if obj.student_id:
+            url = reverse('admin:student_studentprofile_change', args=[obj.student_id])
+            return format_html('<a href="{}">{}</a>', url, name)
+        return name
 
-    # 🎨 Custom columns
-    def student_name(self, obj):
-        return obj.student
-    student_name.short_description = "Student"
-    student_name.admin_order_field = 'student'
+    @admin.display(boolean=True, description=_('Archived?'))
+    def is_archived(self, obj):
+        """True for graduated/archived rows whose profile was deleted."""
+        return obj.student_id is None
 
-    def status_badge(self, obj):
-        color_map = {
-            'Promoted': '#28a745',     # green
-            'Repeated': '#ffc107',     # yellow
-            'Transferred': '#17a2b8',  # blue
-            'Dropped': '#dc3545',      # red
-        }
-        color = color_map.get(obj.status, '#6c757d')
-        return format_html(
-            '<span style="padding:4px 10px; '
-            'border-radius:12px; '
-            'color:white; '
-            'background:{}; '
-            'font-weight:600;">{}</span>',
-            color,
-            obj.status
-        )
-    status_badge.short_description = "Status"
+    # ── Guard rails ─────────────────────────────────────────────────
+    def has_add_permission(self, request):
+        # Normally history is created by the SP. Disable manual adds
+        # to avoid duplicate-key collisions on (student, academic_year).
+        # Remove this override if you *do* want manual entry from admin.
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Allow deletion only for superusers — protects audit trail
+        return request.user.is_superuser
 
 @admin.register(StudentAssessment)
 class StudentAssessmentAdmin(admin.ModelAdmin):
@@ -736,6 +774,7 @@ class StudentAssessmentAdmin(admin.ModelAdmin):
         "student_name",
         "subject_name",
         "academic_year",
+        "term",
         "total_score",
         "result_status",
         "colored_result_status",
@@ -1212,6 +1251,16 @@ from .models import (
     StudentAssessmentScore, StudentProfile, Subject, Year,
     Weight, Grade, Section, Term,
 )
+from setups.widgets import WeightWidget
+from decimal import Decimal, InvalidOperation
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
+
+from .models import (
+    StudentProfile, Subject, Year, Grade, Section, Term, Weight,
+    StudentAssessmentScore,
+)
+from setups.widgets import WeightWidget
 
 
 class StudentAssessmentScoreResource(resources.ModelResource):
@@ -1227,10 +1276,6 @@ class StudentAssessmentScoreResource(resources.ModelResource):
         column_name="academic_year", attribute="academic_year",
         widget=ForeignKeyWidget(Year, "year"),
     )
-    weight = fields.Field(
-        column_name="weight", attribute="weight",
-        widget=ForeignKeyWidget(Weight, "weight"),
-    )
     grade = fields.Field(
         column_name="grade", attribute="grade",
         widget=ForeignKeyWidget(Grade, "code"),
@@ -1244,11 +1289,24 @@ class StudentAssessmentScoreResource(resources.ModelResource):
         widget=ForeignKeyWidget(Term, "name"),
     )
 
+    # Machine value — what import uses
+    weight = fields.Field(
+        column_name="weight", attribute="weight",
+        widget=WeightWidget(Weight),
+    )
+    # Human value — read-only, export-only
+    weight_percentage = fields.Field(
+        column_name="percentage",
+        attribute=None,
+        readonly=True,
+    )
+
     class Meta:
         model = StudentAssessmentScore
         fields = (
             "id", "student", "grade", "section", "term",
-            "academic_year", "subject", "weight",
+            "academic_year", "subject",
+            "weight", "weight_percentage",
             "raw_score", "weighted_score",
         )
         export_order = fields
@@ -1256,6 +1314,34 @@ class StudentAssessmentScoreResource(resources.ModelResource):
         skip_unchanged = True
         report_skipped = True
 
+    # ---- Export: plain strings ---------------------------------------------
+    def dehydrate_student(self, obj):
+        return obj.student.Full_name if obj.student_id else ""
+
+    def dehydrate_subject(self, obj):
+        return obj.subject.name if obj.subject_id else ""
+
+    def dehydrate_academic_year(self, obj):
+        return obj.academic_year.year if obj.academic_year_id else ""
+
+    def dehydrate_grade(self, obj):
+        return obj.grade.code if obj.grade_id else ""
+
+    def dehydrate_section(self, obj):
+        return obj.section.name if obj.section_id else ""
+
+    def dehydrate_term(self, obj):
+        return obj.term.name if obj.term_id else ""
+
+    def dehydrate_weight(self, obj):
+        # RAW name only — this is what import reads back
+        return obj.weight.name.name if obj.weight_id else ""
+
+    def dehydrate_weight_percentage(self, obj):
+        # percentage shown to humans in the CSV — ignored on import
+        return obj.weight.weight if obj.weight_id else ""
+
+    # ---- Import validation -------------------------------------------------
     def before_import_row(self, row, row_number=None, **kwargs):
         raw = row.get("raw_score")
         if raw in (None, ""):
@@ -1268,9 +1354,11 @@ class StudentAssessmentScoreResource(resources.ModelResource):
             raise ValueError(f"Row {row_number}: raw_score cannot be negative.")
         if val > 100:
             raise ValueError(f"Row {row_number}: raw_score cannot exceed 100.")
+        
 @admin.register(Weight)
 class WeightAdmin(admin.ModelAdmin):
-    list_display = ("id", "weight")
+    list_display = ("id", "assessment_formula", "name", "weight", "order", "is_required")
+    list_display_links = ("id", "assessment_formula", "name", "weight", "order", "is_required")
     search_fields = ("weight",)   # required for autocomplete_fields
     
 # admin.py
@@ -1282,7 +1370,7 @@ from .forms import StudentAssessmentScoreForm
 from .models import (
     StudentAssessmentScore, TeacherAssignment, TeacherAssignmentDetail,
 )
-from .resources import StudentAssessmentScoreResource
+# from .resources import StudentAssessmentScoreResource
 
 
 @admin.register(StudentAssessmentScore)
@@ -1291,10 +1379,10 @@ class StudentAssessmentScoreAdmin(ImportExportMixin, admin.ModelAdmin):
     form = StudentAssessmentScoreForm
 
     list_display = (
-        "student_name", "grade", "section", "term",
+        "id", "student_name", "grade", "section", "term",
         "subject_name", "weight", "raw_score", "weighted_score",
     )
-    list_display_links = ("student_name", "subject_name")
+    list_display_links = ("id", "student_name", "subject_name")
     list_editable = ("raw_score", "weighted_score")
 
     # THE single biggest admin speedup:
@@ -1834,22 +1922,102 @@ class StudentResultAdmin(admin.ModelAdmin):
     print_student_result_rank_pdf.short_description = "Print Student Mark List (PDF)"
 
     # print_student_roster_pdf.short_description = "Print Student Roster (PDF)"
-    from reportlab.lib.pagesizes import landscape, A4
-    from reportlab.lib import colors
-    from reportlab.lib.units import cm
-    from reportlab.pdfgen import canvas
-    from reportlab.platypus import Table, TableStyle
-    from django.http import HttpResponse
-    import math
-
     def print_student_roster_pdf(modeladmin, request, queryset):
         from django.http import HttpResponse
+        from django.db.models import Q, Value, CharField
+        from django.db.models.functions import Concat
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.pdfgen import canvas
         from reportlab.platypus import Table, TableStyle
         from reportlab.lib.units import cm
         from reportlab.lib import colors
+        from reportlab.lib.utils import ImageReader
         from collections import defaultdict
+
+        # ─── Signature helpers ────────────────────────────────────────────
+        _sig_cache = {}
+
+        def _get_signature_path(name, is_admin=False):
+            """Resolve a signature image path by name — tries both staff models
+            and matches full_name_am, full_name_en, OR the concatenated form
+            (which is what AdminStaffProfile.__str__ / StaffProfile.__str__ produce)."""
+            if not name:
+                return None
+            name = str(name).strip()
+            if not name:
+                return None
+
+            key = (name.lower(), bool(is_admin))
+            if key in _sig_cache:
+                return _sig_cache[key]
+
+            try:
+                from humanresource.models import StaffProfile, AdminStaffProfile
+            except Exception:
+                _sig_cache[key] = None
+                return None
+
+            models_to_try = (
+                [AdminStaffProfile, StaffProfile]
+                if is_admin else
+                [StaffProfile, AdminStaffProfile]
+            )
+
+            path = None
+            for M in models_to_try:
+                try:
+                    qs = (
+                        M.objects
+                        .annotate(full_concat=Concat(
+                            'full_name_am', Value(' '), 'full_name_en',
+                            output_field=CharField(),
+                        ))
+                        .filter(
+                            Q(full_name_am__iexact=name)
+                            | Q(full_name_en__iexact=name)
+                            | Q(full_concat__iexact=name)
+                        )
+                        .exclude(signature='')
+                        .exclude(signature__isnull=True)
+                    )
+                    obj = qs.first()
+                    if obj and obj.signature:
+                        path = obj.signature.path
+                        break
+                except Exception:
+                    continue
+
+            _sig_cache[key] = path
+            return path
+
+        def _draw_signature(c, path, x, y, w, h,
+                            pad=1,
+                            max_render_w=2.0*cm,
+                            max_render_h=0.8*cm):
+            if not path or w <= 0 or h <= 0:
+                return False
+            try:
+                img = ImageReader(path)
+                iw, ih = img.getSize()
+                if not iw or not ih:
+                    return False
+
+                avail_w = min(w - 2*pad, max_render_w)
+                avail_h = min(h - 2*pad, max_render_h)
+                if avail_w <= 0 or avail_h <= 0:
+                    return False
+
+                scale = min(avail_w / iw, avail_h / ih)
+                nw, nh = iw * scale, ih * scale
+
+                # LEFT aligned, sitting ON the underline (bottom of the cell)
+                dx = x + pad
+                dy = y + pad
+
+                c.drawImage(img, dx, dy, width=nw, height=nh, mask='auto')
+                return True
+            except Exception:
+                return False
 
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename="student_results_report.pdf"'
@@ -1862,8 +2030,6 @@ class StudentResultAdmin(admin.ModelAdmin):
         TOP_MARGIN = 1.8 * cm
         LEFT_MARGIN = 0.5 * cm
         RIGHT_MARGIN = 0.4 * cm
-        SEMESTER_LABELS = ["Q1", "Q2", "S1", "Q3", "Q4", "S2", "Av."]
-        TERM_LABELS = ["Term one", "Term two", "Term three", "Term four"]
 
         available_width = width - LEFT_MARGIN - RIGHT_MARGIN
 
@@ -1892,10 +2058,6 @@ class StudentResultAdmin(admin.ModelAdmin):
             return {k: round(acc[k] / counts[k], 2) for k in acc}
 
         def competition_rank(values_by_id, descending=True):
-            """Standard competition ranking (1,2,2,4) like Excel RANK().
-            values_by_id: dict {student_id: numeric or None}
-            Returns {student_id: rank_int}
-            """
             pairs = [(sid, v) for sid, v in values_by_id.items() if v is not None]
             if not pairs:
                 return {}
@@ -1903,7 +2065,7 @@ class StudentResultAdmin(admin.ModelAdmin):
             ranks, prev_val, prev_rank = {}, None, 0
             for idx, (sid, val) in enumerate(pairs, start=1):
                 if prev_val is not None and val == prev_val:
-                    ranks[sid] = prev_rank            # tie -> same rank
+                    ranks[sid] = prev_rank
                 else:
                     ranks[sid] = idx
                     prev_rank = idx
@@ -1927,8 +2089,7 @@ class StudentResultAdmin(admin.ModelAdmin):
             key = (row.grade, row.section)
             grouped[key][row.student_id][row.semester] = row
 
-        # ---------- pre-compute S1/S2/Av ranks per (grade, section) ----------
-        # Structure: derived[(grade, section)][student_id] = dict of derived values
+        # ---------- pre-compute S1/S2/Av ranks ----------
         derived = defaultdict(dict)
 
         for key, students_map in grouped.items():
@@ -1968,7 +2129,6 @@ class StudentResultAdmin(admin.ModelAdmin):
                 s2_avgs[sid] = s2_avg
                 av_avgs[sid] = av_avg
 
-            # Compute competition ranks across the WHOLE class (not per page)
             s1_ranks = competition_rank(s1_avgs)
             s2_ranks = competition_rank(s2_avgs)
             av_ranks = competition_rank(av_avgs)
@@ -1976,7 +2136,6 @@ class StudentResultAdmin(admin.ModelAdmin):
             for sid, d in derived[key].items():
                 d["s1_rank"] = s1_ranks.get(sid)
                 d["s2_rank"] = s2_ranks.get(sid)
-                # Prefer YEARLY_RANK from the DB if present, else computed rank
                 db_yearly = g(d["anchor"], "YEARLY_RANK", None)
                 d["av_rank"] = db_yearly if db_yearly else av_ranks.get(sid)
 
@@ -2082,19 +2241,18 @@ class StudentResultAdmin(admin.ModelAdmin):
                         ("Q2", q2.subjects if q2 else {}, g(q2, "total"), g(q2, "average"),
                         g(q2, "rank"), g(q2, "discipline"), ""),
                         ("S1", d["s1_subj"], d["s1_total"], d["s1_avg"],
-                        d["s1_rank"], "", ""),                       # ✅ S1 rank
+                        d["s1_rank"], "", ""),
                         ("Q3", q3.subjects if q3 else {}, g(q3, "total"), g(q3, "average"),
                         g(q3, "rank"), g(q3, "discipline"), ""),
                         ("Q4", q4.subjects if q4 else {}, g(q4, "total"), g(q4, "average"),
                         g(q4, "rank"), g(q4, "discipline"), ""),
                         ("S2", d["s2_subj"], d["s2_total"], d["s2_avg"],
-                        d["s2_rank"], "", ""),                       # ✅ S2 rank
+                        d["s2_rank"], "", ""),
                         ("Av.", d["av_subj"], d["av_total"], d["av_avg"],
-                        d["av_rank"], "", g(anchor, "result_status")),  # ✅ Av. rank
+                        d["av_rank"], "", g(anchor, "result_status")),
                     ]
 
-                    for i, (label, subj_dict, tot_v, avg_v, rnk, conduct, remark) in \
-                            enumerate(display_rows):
+                    for i, (label, subj_dict, tot_v, avg_v, rnk, conduct, remark) in enumerate(display_rows):
                         data_row = [
                             str(roll_no) if i == 0 else "",
                             str(anchor.student_id) if i == 0 else "",
@@ -2144,7 +2302,7 @@ class StudentResultAdmin(admin.ModelAdmin):
                 student_table.setStyle(TableStyle(style))
 
                 w, h = student_table.wrapOn(c, width, y)
-                if y - h < 4.2 * cm:
+                if y - h < 6.0 * cm:      # reserve room for the taller footer rows
                     c.showPage()
                     y = height - TOP_MARGIN
                     c.setFont("Nyala", 9)
@@ -2157,18 +2315,28 @@ class StudentResultAdmin(admin.ModelAdmin):
                 y -= h + 0.4 * cm
 
                 # ---- FOOTER ----
-                footer_student = students_map[page_ids[0]].get("Term one")
+                footer_student = first
+
+                # Wider signature columns (3.5 cm each); last column = remaining (stamp)
+                fw_base = [
+                    1.4 * cm,             # ሰሚስተር
+                    3.8 * cm,             # የክፍል ኃላፊ ስም
+                    3.5 * cm,             # ፊርማ (section head)
+                    3.8 * cm,             # የመዘክር ክፍል ኃላፊ ስም
+                    3.5 * cm,             # ፊርማ (archive officer)
+                    3.8 * cm,             # የት/ቤቱ ር/መ/ር ስም
+                    3.5 * cm,             # ፊርማ (director)
+                ]
+                fw_last = max(0.0, available_width - sum(fw_base))
+                fw = fw_base + [fw_last]              # 8 cells: 7 fixed + stamp remainder
+
+                # Header row (7 cells — header table only covers the 7 labelled columns)
                 footer_headers_data = [[
                     "ሰሚስተር", "የክፍል ኃላፊ ስም", "ፊርማ",
                     "የመዘክር ክፍል ኃላፊ ስም", "ፊርማ",
                     "የት/ቤቱ ር/መ/ር ስም", "ፊርማ",
                 ]]
-                fw = [
-                    1.5 * cm, 4.0 * cm, 2.0 * cm, 3.5 * cm,
-                    2.0 * cm, 4.0 * cm, 1.5 * cm,
-                    available_width - (1.5 + 4 + 2 + 2.5 + 2 + 4 + 1.5) * cm,
-                ]
-                ft_h = Table(footer_headers_data, colWidths=fw)
+                ft_h = Table(footer_headers_data, colWidths=fw[:7])
                 ft_h.setStyle(TableStyle([
                     ('FONTNAME', (0, 0), (-1, -1), 'Nyala'),
                     ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -2180,31 +2348,61 @@ class StudentResultAdmin(admin.ModelAdmin):
                 ]))
                 w, h = ft_h.wrapOn(c, width, y)
                 ft_h.drawOn(c, LEFT_MARGIN, y - h)
-                y -= h + 0.1 * cm
+                y -= h
+
+                # Signature rows — 1.6 cm tall so images can render at a usable size
+                FOOTER_ROW_H = 0.8 * cm
 
                 for sem_label in ("1ኛ", "2ኛ"):
                     data = [[
                         f"{sem_label}  ",
-                        str(footer_student.section_head or ""), "___________",
-                        str(footer_student.archive_officer_name or ""), "_____________",
-                        str(footer_student.school_director_name or ""), "___________",
+                        str(footer_student.section_head or ""), "",
+                        str(footer_student.archive_officer_name or ""), "",
+                        str(footer_student.school_director_name or ""), "",
                         "የት/ቤቱ ማህተም" if sem_label == "2ኛ" else "",
                     ]]
-                    ft = Table(data, colWidths=fw)
+                    ft = Table(data, colWidths=fw, rowHeights=[FOOTER_ROW_H])
                     ft.setStyle(TableStyle([
                         ('FONTNAME', (0, 0), (-1, -1), 'Nyala'),
                         ('FONTSIZE', (0, 0), (-1, -1), 8),
                         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
                         ('TOPPADDING', (0, 0), (-1, -1), 1),
                         ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                        # underline below name cells
                         ('LINEBELOW', (1, 0), (1, 0), 0.5, colors.black),
                         ('LINEBELOW', (3, 0), (3, 0), 0.5, colors.black),
                         ('LINEBELOW', (5, 0), (5, 0), 0.5, colors.black),
+                        # underline below signature cells
+                        ('LINEBELOW', (2, 0), (2, 0), 0.5, colors.black),
+                        ('LINEBELOW', (4, 0), (4, 0), 0.5, colors.black),
+                        ('LINEBELOW', (6, 0), (6, 0), 0.5, colors.black),
                     ]))
                     w, h = ft.wrapOn(c, width, y)
-                    ft.drawOn(c, LEFT_MARGIN, y - h)
-                    y -= h + 0.1 * cm
+                    row_bottom = y - h
+                    ft.drawOn(c, LEFT_MARGIN, row_bottom)
+
+                    # ── Draw the 3 signature images ──
+                    def _col_x(idx):
+                        return LEFT_MARGIN + sum(fw[:idx])
+
+                    sig_bottom = row_bottom + 2
+                    sig_top = row_bottom + h - 2
+                    sig_h = max(0.0, sig_top - sig_bottom)
+
+                    for col_idx, name, is_admin in (
+                        (2, footer_student.section_head, False),
+                        (4, footer_student.archive_officer_name, True),
+                        (6, footer_student.school_director_name, False),
+                    ):
+                        sig_path = _get_signature_path(name, is_admin=is_admin)
+                        _draw_signature(
+                            c, sig_path,
+                            _col_x(col_idx), sig_bottom,
+                            fw[col_idx], sig_h,
+                        )
+
+                    y -= h
 
                 if page_start + STUDENTS_PER_PAGE < len(student_ids):
                     c.showPage()
@@ -2684,7 +2882,7 @@ class StudentResultAdmin(admin.ModelAdmin):
         return response
 
 
-    print_individual_student_result_pdf.short_description = "Print Student Report Cards (PDF)"
+    print_individual_student_result_pdf.short_description = "Print Student Cards (PDF)"
 # student/admin.py
 from django.contrib import admin
 from django.http import HttpResponse
